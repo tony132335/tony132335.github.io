@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mic Amplifier — 麥克風放大器 Demo</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heiti TC,Arial;}
+    body{max-width:900px;margin:30px auto;padding:18px;background:#0f172a;color:#e6eef8;border-radius:12px;box-shadow:0 10px 30px rgba(2,6,23,.6)}
+    h1{font-size:20px;margin:0 0 8px}
+    p{margin:6px 0 12px;color:#c6d6ea}
+    .controls{display:flex;gap:12px;flex-wrap:wrap}
+    .card{background:#091029;padding:12px;border-radius:10px;flex:1;min-width:220px}
+    label{display:block;font-size:12px;color:#99b2d4;margin-bottom:6px}
+    input[type=range]{width:100%}
+    button{background:#2b6cb0;border:0;padding:8px 12px;border-radius:8px;color:white;cursor:pointer}
+    button.secondary{background:#1f2937}
+    canvas{width:100%;height:60px;border-radius:8px;background:#061026;display:block}
+    .meter{height:14px;background:#06243b;border-radius:6px;overflow:hidden}
+    .meter > i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#38bdf8,#0ea5a6)}
+    footer{font-size:12px;color:#88a6d0;margin-top:12px}
+    .warn{color:#ffd4d6;background:#3b1012;padding:8px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <h1>麥克風放大器 Demo</h1>
+  <p>按下「開始」取得麥克風，調整增益（Gain）放大聲音。建議戴耳機以避免自回授（feedback）。</p>
+
+  <div class="controls">
+    <div class="card">
+      <label>控制</label>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btnStart">開始</button>
+        <button id="btnStop" class="secondary" disabled>停止</button>
+        <button id="btnMute" class="secondary" disabled>靜音</button>
+      </div>
+
+      <div style="margin-top:12px">
+        <label for="gain">增益 (Gain) <span id="gainVal">1.0</span>x</label>
+        <input id="gain" type="range" min="0" max="6" step="0.01" value="1">
+      </div>
+
+      <div style="margin-top:12px">
+        <label><input id="useCompressor" type="checkbox"> 開啟簡易限制器 (Compressor)</label>
+      </div>
+
+    </div>
+
+    <div class="card">
+      <label>即時音量表</label>
+      <canvas id="viz" width="800" height="80"></canvas>
+      <div style="margin-top:8px">
+        <label>峰值</label>
+        <div class="meter"><i id="peakBar"></i></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>輸出音量 (播放音量)</label>
+        <input id="outVolume" type="range" min="0" max="1" step="0.01" value="0.9">
+        <div style="font-size:12px;color:#9fb6df;margin-top:6px">注意：若出現刺耳回授，立刻按停止或降低音量。</div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <div class="warn">安全提醒：請戴耳機以避免回授。調增益時請從小幅度慢慢增加。高增益會導致破音或不適。</div>
+  </footer>
+
+<script>
+(async function(){
+  const btnStart = document.getElementById('btnStart');
+  const btnStop = document.getElementById('btnStop');
+  const btnMute = document.getElementById('btnMute');
+  const gainSlider = document.getElementById('gain');
+  const gainVal = document.getElementById('gainVal');
+  const useCompressor = document.getElementById('useCompressor');
+  const outVolume = document.getElementById('outVolume');
+
+  const canvas = document.getElementById('viz');
+  const ctx = canvas.getContext('2d');
+  const peakBar = document.getElementById('peakBar');
+
+  let audioCtx = null;
+  let micStream = null;
+  let sourceNode = null;
+  let gainNode = null;
+  let compressor = null;
+  let analyser = null;
+  let destinationGain = null;
+  let rafId = null;
+  let playing = false;
+  let muted = false;
+
+  function initAudio() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  async function start() {
+    try {
+      initAudio();
+      micStream = await navigator.mediaDevices.getUserMedia({audio:true});
+      sourceNode = audioCtx.createMediaStreamSource(micStream);
+
+      gainNode = audioCtx.createGain();
+      gainNode.gain.value = Number(gainSlider.value);
+
+      compressor = audioCtx.createDynamicsCompressor();
+      // gentle default compressor settings
+      compressor.threshold.setValueAtTime(-6, audioCtx.currentTime);
+      compressor.knee.setValueAtTime(20, audioCtx.currentTime);
+      compressor.ratio.setValueAtTime(6, audioCtx.currentTime);
+      compressor.attack.setValueAtTime(0.01, audioCtx.currentTime);
+      compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
+
+      analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 2048;
+
+      destinationGain = audioCtx.createGain();
+      destinationGain.gain.value = Number(outVolume.value);
+
+      // routing: source -> gain -> (compressor?) -> analyser -> destinationGain -> audioCtx.destination
+      sourceNode.connect(gainNode);
+      if (useCompressor.checked) {
+        gainNode.connect(compressor);
+        compressor.connect(analyser);
+      } else {
+        gainNode.connect(analyser);
+      }
+      analyser.connect(destinationGain);
+      destinationGain.connect(audioCtx.destination);
+
+      drawLoop();
+      playing = true;
+      btnStop.disabled = false;
+      btnMute.disabled = false;
+      btnStart.disabled = true;
+      btnStart.textContent = '已連線';
+
+    } catch (e) {
+      console.error(e);
+      alert('無法取得麥克風：' + (e && e.message ? e.message : e));
+    }
+  }
+
+  function stop() {
+    if (micStream) {
+      const tracks = micStream.getTracks();
+      tracks.forEach(t => t.stop());
+    }
+    if (sourceNode) try{ sourceNode.disconnect(); }catch{};
+    if (gainNode) try{ gainNode.disconnect(); }catch{};
+    if (compressor) try{ compressor.disconnect(); }catch{};
+    if (analyser) try{ analyser.disconnect(); }catch{};
+    if (destinationGain) try{ destinationGain.disconnect(); }catch{};
+
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    micStream = null;
+    sourceNode = null;
+    gainNode = null;
+    compressor = null;
+    analyser = null;
+    destinationGain = null;
+    playing = false;
+    btnStop.disabled = true;
+    btnMute.disabled = true;
+    btnStart.disabled = false;
+    btnStart.textContent = '開始';
+    peakBar.style.width = '0%';
+    clearCanvas();
+  }
+
+  function muteToggle(){
+    if (!destinationGain) return;
+    muted = !muted;
+    destinationGain.gain.value = muted ? 0 : Number(outVolume.value);
+    btnMute.textContent = muted ? '取消靜音' : '靜音';
+  }
+
+  gainSlider.addEventListener('input', ()=>{
+    gainVal.textContent = Number(gainSlider.value).toFixed(2);
+    if (gainNode) gainNode.gain.setValueAtTime(Number(gainSlider.value), audioCtx.currentTime);
+  });
+
+  outVolume.addEventListener('input', ()=>{
+    if (destinationGain && !muted) destinationGain.gain.setValueAtTime(Number(outVolume.value), audioCtx.currentTime);
+  });
+
+  useCompressor.addEventListener('change', ()=>{
+    if (!sourceNode || !gainNode || !analyser || !destinationGain) return;
+    // reconnect nodes to insert/remove compressor
+    try{
+      gainNode.disconnect();
+      if (useCompressor.checked) {
+        gainNode.connect(compressor);
+        compressor.connect(analyser);
+      } else {
+        gainNode.connect(analyser);
+      }
+    }catch(e){console.warn(e)}
+  });
+
+  btnStart.addEventListener('click', start);
+  btnStop.addEventListener('click', stop);
+  btnMute.addEventListener('click', muteToggle);
+
+  function clearCanvas(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#061026';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+
+  function drawLoop(){
+    if (!analyser) return;
+    const bufferLength = analyser.fftSize;
+    const data = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(data);
+
+    clearCanvas();
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const sliceWidth = canvas.width * 1.0 / bufferLength;
+    let x = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      const v = data[i] / 128.0; // 0..2
+      const y = v * canvas.height/2;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+      x += sliceWidth;
+    }
+    ctx.strokeStyle = '#6dd3ff';
+    ctx.stroke();
+
+    // compute peak
+    let peak = 0;
+    for (let i=0;i<bufferLength;i++){
+      const val = Math.abs(data[i]-128)/128; // 0..1
+      if (val>peak) peak=val;
+    }
+    const peakPerc = Math.min(1, peak*1.4); // scale
+    peakBar.style.width = (peakPerc*100).toFixed(1) + '%';
+
+    rafId = requestAnimationFrame(drawLoop);
+  }
+
+  // accessibility: resume audio context on user gesture (mobile browsers often require this)
+  document.addEventListener('click', function resumeAudio(){
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    document.removeEventListener('click', resumeAudio);
+  });
+
+  // cleanup on page hide
+  window.addEventListener('pagehide', stop);
+
+})();
+</script>
+</body>
+</html>
