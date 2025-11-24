@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>智慧即時課程表 Pro + AI</title>
+    <title>智慧即時課程表 AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
@@ -352,162 +352,161 @@
             }
         }
 
-        // --- 核心數據結構 ---
-        const DEFAULT_CONFIG =  {
-  "settings": {
-    "referenceDate": "2025-11-24",
-    "referenceWeekType": "A"
-  },
-  "schedules": {
-    "A_1": [
-      { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Eng(Sp)", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "Eng", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "Eng", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "CL", "type": "lesson" }
-    ],
-    "A_2": [
-      { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "PE", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "PE", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "Geog", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "Math", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Hist", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "IS", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "Eng", "type": "lesson" }
-    ],
-    "A_3": [
-      { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Music", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "Music", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "PTH", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "Eng", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "Math", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "IS", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "Chi", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
-    ],
-    "A_4": [
-      { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Math", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "Eng", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "CHist", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "STEAM", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "STEAM", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "IS", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "Chi", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "Chi", "type": "lesson" }
-    ],
-    "A_5": [
-      { "start": "08:00", "end": "08:15", "subject": "QTV / CTT", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "CHist", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "IS", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "Math", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "Chi", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Geog", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "PSE", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "PSE", "type": "lesson" }
-    ],
-    "B_1": [
-      { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Chi", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "Eng", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "Music", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "Music", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "CL", "type": "lesson" }
-    ],
-    "B_2": [
-      { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "PE", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "PE", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "VA", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "VA", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "Eng", "type": "lesson" }
-    ],
-    "B_3": [
-      { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "CHist", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "Math", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "IS", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Chi", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "Hist", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
-    ],
-    "B_4": [
-      { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "Math", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "STEAM", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "STEAM", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Chi", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "Math", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
-    ],
-    "B_5": [
-      { "start": "08:00", "end": "08:15", "subject": "QTV / CTT", "type": "activity" },
-      { "start": "08:15", "end": "09:00", "subject": "Math", "type": "lesson" },
-      { "start": "09:00", "end": "09:45", "subject": "Geog", "type": "lesson" },
-      { "start": "09:45", "end": "10:30", "subject": "Hist", "type": "lesson" },
-      { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
-      { "start": "10:50", "end": "11:35", "subject": "Chi", "type": "lesson" },
-      { "start": "11:35", "end": "12:20", "subject": "Chi", "type": "lesson" },
-      { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
-      { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
-      { "start": "13:40", "end": "14:25", "subject": "Eng(Sp)", "type": "lesson" },
-      { "start": "14:25", "end": "15:10", "subject": "Eng", "type": "lesson" },
-      { "start": "15:10", "end": "15:55", "subject": "PSE", "type": "lesson" }
-    ]
-  },
-  "specialEvents": {}
-};
+        // --- 核心數據結構 (Updated with 1B Timetable Data) ---
+        const DEFAULT_CONFIG = {
+          "settings": {
+            "referenceDate": "2024-11-24",
+            "referenceWeekType": "A"
+          },
+          "schedules": {
+            "A_1": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng(Sp)", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Eng", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Eng", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CL", "type": "lesson" }
+            ],
+            "A_2": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "PE", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "PE", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Geog", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Math", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Hist", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "IS", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "Eng", "type": "lesson" }
+            ],
+            "A_3": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Music", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Music", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "PTH", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Eng", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Math", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "IS", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Chi", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
+            ],
+            "A_4": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Math", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Eng", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "CHist", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "STEAM", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "STEAM", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "IS", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Chi", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "Chi", "type": "lesson" }
+            ],
+            "A_5": [
+              { "start": "08:00", "end": "08:15", "subject": "OTV / CTT", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "CHist", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "IS", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Math", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Chi", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Geog", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "PSE", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "PSE", "type": "lesson" }
+            ],
+            "B_1": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Chi", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Eng", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Music", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Music", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CL", "type": "lesson" }
+            ],
+            "B_2": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "PE", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "PE", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "VA", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "VA", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "Eng", "type": "lesson" }
+            ],
+            "B_3": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "CHist", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Math", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "IS", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Chi", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Hist", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
+            ],
+            "B_4": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Math", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "STEAM", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "STEAM", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Chi", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Math", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
+            ],
+            "B_5": [
+              { "start": "08:00", "end": "08:15", "subject": "OTV / CTT", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Math", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Geog", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Hist", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Chi", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Chi", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Eng(Sp)", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Eng", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "PSE", "type": "lesson" }
+            ]
+          },
+          "specialEvents": {}
+        };
 
         let appData = null;
         let editingDayKey = null; 
-        let pendingImportData = null; // 暫存導入的資料
+        let pendingImportData = null; 
 
-        // --- 初始化與 URL 同步 ---
         window.onload = function() {
             if(window.location.hash.startsWith("#data=")) {
                 try {
@@ -539,7 +538,7 @@
             }
         }
 
-        // --- 核心邏輯 ---
+        // --- Core Logic ---
 
         function getWeekType(date) {
             const refDate = new Date(appData.settings.referenceDate);
@@ -593,7 +592,7 @@
             return `${h>0?h+':':''}${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
         }
 
-        // --- 主畫面渲染與即時更新 ---
+        // --- Render UI ---
 
         function renderApp() {
             const listContainer = document.getElementById('timelineContainer');
@@ -619,7 +618,6 @@
                 if(item.type === 'break') { icon = "fa-mug-hot"; iconColor = "text-green-400"; }
                 else if (item.type === 'activity') { icon = "fa-star"; iconColor = "text-yellow-400"; }
 
-                // Determine if we should show the "Ask AI" button (for non-break items)
                 const showAiBtn = item.type === 'lesson';
 
                 el.innerHTML = `
@@ -675,22 +673,20 @@
 
                 if(!card) continue;
 
-                // Reset styles
                 card.classList.remove('active-card', 'past-card');
                 card.querySelector('.status-badge').classList.add('hidden');
                 card.querySelector('.progress-bg').style.opacity = '0';
                 card.querySelector('.countdown-timer').innerText = '';
                 
-                // Show AI button on active card regardless of hover
                 const aiBtn = card.querySelector('.ai-hint-btn');
-                if(aiBtn) aiBtn.classList.remove('opacity-100'); // reset first
+                if(aiBtn) aiBtn.classList.remove('opacity-100'); 
 
                 if (now >= start && now < end) {
                     currentIdx = i;
                     card.classList.add('active-card');
                     card.querySelector('.status-badge').classList.remove('hidden');
                     card.querySelector('.progress-bg').style.opacity = '1';
-                    if(aiBtn) aiBtn.classList.add('opacity-100'); // Always show on active
+                    if(aiBtn) aiBtn.classList.add('opacity-100'); 
                     
                     const percent = ((now - start) / (end - start)) * 100;
                     card.querySelector('.progress-bg').style.width = `${percent}%`;
@@ -765,15 +761,12 @@
             const box = document.getElementById('aiAdviceBox');
             const textEl = document.getElementById('aiAdviceText');
             
-            // Show box with loading state
             box.classList.remove('hidden');
             setTimeout(() => box.classList.remove('translate-y-full'), 10);
             textEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-purple-500"></i> AI 正在為你準備關於 ${subject} 的學習貼士...`;
 
             try {
-                // Generate prompt
                 const prompt = `Give me a short, encouraging study tip, a fun fact, or a quick motivation quote for a secondary school student about to attend a "${subject}" class. Keep it under 40 words. Language: Traditional Chinese (HK style). Tone: Cheerful and helpful.`;
-                
                 const responseText = await callGemini(prompt);
                 textEl.innerText = responseText;
             } catch (error) {
@@ -813,11 +806,7 @@
                 const jsonStr = await callGemini(prompt, true);
                 let scheduleData = JSON.parse(jsonStr);
                 
-                // Cleanup: remove any potential markdown wrapper if Gemini adds it despite instructions
-                // (Though "responseMimeType": "application/json" usually handles this)
-                
                 if (Array.isArray(scheduleData)) {
-                    // Populate UI
                     const container = document.getElementById('editorRowsContainer');
                     container.innerHTML = '';
                     scheduleData.forEach(item => addEditorRowUI(item));
@@ -837,7 +826,7 @@
             }
         }
 
-        // --- GUI 編輯器邏輯 ---
+        // --- GUI Editor ---
 
         function openEditor() {
             const modal = document.getElementById('editorModal');
@@ -902,7 +891,7 @@
             schedule.forEach((item, index) => {
                 addEditorRowUI(item);
             });
-            closeAiImport(); // Reset AI view when switching days
+            closeAiImport();
         }
 
         function addEditorRow() {
@@ -968,13 +957,12 @@
             }
         }
 
-        // --- 導出與分享 ---
+        // --- Export & Share ---
 
         function openShare() {
             document.getElementById('shareModal').classList.remove('hidden');
             generateShareLink();
             
-            // 重置導入狀態
             document.getElementById('importFileInput').value = '';
             document.getElementById('importFileName').innerText = '選擇 .json 檔案';
             document.getElementById('importBtn').disabled = true;
@@ -1005,7 +993,7 @@
             downloadAnchorNode.remove();
         }
 
-        // --- JSON 文件導入邏輯 ---
+        // --- Import Logic ---
 
         function handleFileSelect(input) {
             const file = input.files[0];
@@ -1016,7 +1004,6 @@
                 reader.onload = function(e) {
                     try {
                         const json = JSON.parse(e.target.result);
-                        // 基本驗證
                         if (json.schedules && json.settings) {
                             pendingImportData = json;
                             document.getElementById('importBtn').disabled = false;
@@ -1040,7 +1027,6 @@
                 if(confirm("確定要導入此備份嗎？這將覆蓋您當前的所有課程表設定，且無法復原。")) {
                     appData = pendingImportData;
                     localStorage.setItem('schoolTimetableConfig', JSON.stringify(appData));
-                    // 刷新頁面以應用新設定
                     location.reload(); 
                 }
             }
