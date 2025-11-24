@@ -3,211 +3,244 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>实时 Pi 计算器 (Spigot算法)</title>
+    <title>Pi 计算器 - Web Worker 多线程版</title>
     <style>
         body {
-            font-family: 'Courier New', Courier, monospace; /* 使用等宽字体 */
-            background-color: #1e1e1e;
-            color: #00ff41; /* 黑客帝国绿 */
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #0d0d0d;
+            color: #00ff41;
             margin: 0;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            min-height: 100vh;
+            height: 100vh;
+            overflow: hidden;
         }
 
         h1 {
-            margin-bottom: 10px;
-            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+            margin: 10px 0;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
         }
 
         .controls {
-            margin-bottom: 20px;
-            background: #333;
-            padding: 10px 20px;
+            background: #222;
+            padding: 15px;
             border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            border: 1px solid #333;
+            z-index: 10;
         }
 
         button {
-            padding: 8px 16px;
+            padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
             background-color: #007acc;
             color: white;
             border: none;
             border-radius: 4px;
-            margin: 0 5px;
-            transition: background 0.2s;
+            transition: transform 0.1s;
         }
 
-        button:hover {
-            background-color: #005f9e;
-        }
+        button:active { transform: scale(0.95); }
+        button.stop { background-color: #d32f2f; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
 
-        button.stop {
-            background-color: #d32f2f;
-        }
-
-        button.stop:hover {
-            background-color: #a52222;
-        }
-
-        .status {
+        .stats {
+            display: flex;
+            gap: 30px;
             margin-bottom: 10px;
-            font-size: 1.2em;
+            font-size: 14px;
+            color: #aaa;
         }
+        .stat-val { color: #fff; font-weight: bold; font-size: 1.2em; }
 
-        #pi-content {
-            width: 90%;
-            max-width: 1000px;
+        #pi-container {
+            flex: 1;
+            width: 100%;
+            max-width: 1200px;
             background-color: #000;
             border: 1px solid #333;
-            padding: 20px;
+            padding: 15px;
             border-radius: 4px;
-            word-wrap: break-word; /* 关键：让数字自动换行 */
-            font-size: 18px;
-            line-height: 1.5;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
-            min-height: 200px;
-        }
-
-        .digit {
-            display: inline;
+            overflow-y: auto; /* 允许垂直滚动 */
+            word-wrap: break-word;
+            font-size: 16px;
+            line-height: 1.4;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
         }
         
-        /* 为了突出显示刚刚计算出来的数字 */
-        @keyframes flash {
-            0% { color: white; background: #00ff41; }
-            100% { color: #00ff41; background: transparent; }
-        }
-        
-        .new-digit {
-            animation: flash 0.5s ease-out;
-        }
+        /* 滚动条样式 */
+        #pi-container::-webkit-scrollbar { width: 10px; }
+        #pi-container::-webkit-scrollbar-track { background: #111; }
+        #pi-container::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+        #pi-container::-webkit-scrollbar-thumb:hover { background: #555; }
     </style>
 </head>
 <body>
 
-    <h1>&pi; Pi 实时计算器</h1>
+    <h1>&pi; Pi 终极计算器 (Web Worker)</h1>
     
     <div class="controls">
-        <button id="btnStart" onclick="startCalculation()">开始计算</button>
-        <button id="btnStop" class="stop" onclick="stopCalculation()">暂停</button>
-        <button onclick="resetCalculation()">重置</button>
+        <button id="btnStart" onclick="startWorker()">启动引擎</button>
+        <button id="btnStop" class="stop" onclick="stopWorker()" disabled>停止</button>
+        <button onclick="copyToClipboard()">复制结果</button>
     </div>
 
-    <div class="status">
-        当前已计算位数: <strong id="count">0</strong>
+    <div class="stats">
+        <div>已计算位数: <span id="count" class="stat-val">0</span></div>
+        <div>耗时: <span id="timer" class="stat-val">0.0</span> s</div>
+        <div>速度: <span id="speed" class="stat-val">0</span> 位/秒</div>
     </div>
 
-    <div id="pi-content">3.</div>
+    <div id="pi-container">3.</div>
+
+    <script id="worker-code" type="javascript/worker">
+        let isRunning = false;
+        
+        // 算法状态
+        let q = 1n, r = 0n, t = 1n, k = 1n, n = 3n, l = 3n;
+        
+        self.onmessage = function(e) {
+            if (e.data === 'start') {
+                isRunning = true;
+                calculate();
+            } else if (e.data === 'stop') {
+                isRunning = false;
+            } else if (e.data === 'reset') {
+                isRunning = false;
+                q = 1n; r = 0n; t = 1n; k = 1n; n = 3n; l = 3n;
+            }
+        };
+
+        function calculate() {
+            // 每次处理的时间片 (毫秒)
+            // Worker 里可以把这个值设大一点，因为它不影响 UI
+            const TIME_SLICE = 50; 
+            
+            while (isRunning) {
+                const startTime = performance.now();
+                let batchDigits = "";
+                let iterations = 0;
+
+                // 在 TIME_SLICE 时间内尽可能多算
+                while (performance.now() - startTime < TIME_SLICE) {
+                    if (4n * q + r - t < n * t) {
+                        batchDigits += n.toString();
+                        
+                        let nr = 10n * (r - n * t);
+                        n = ((10n * (3n * q + r)) / t) - 10n * n;
+                        q *= 10n;
+                        r = nr;
+                    } else {
+                        let nr = (2n * q + r) * l;
+                        let nn = (q * (7n * k) + 2n + r * l) / (t * l);
+                        q *= k;
+                        t *= l;
+                        l += 2n;
+                        k += 1n;
+                        n = nn;
+                        r = nr;
+                    }
+                    iterations++;
+                }
+
+                // 发送数据回主线程
+                if (batchDigits.length > 0) {
+                    self.postMessage({ type: 'data', digits: batchDigits });
+                }
+                
+                // 如果需要非常高的响应速度，可以加一点微小的延迟，
+                // 但在 Worker 里通常不需要，直接循环即可
+                // 为了能接收 'stop' 消息，我们需要跳出当前的同步执行栈
+                // 但由于这是 while(isRunning)，我们需要一种机制来检查消息
+                // 在 JS 单线程模型中，最好的方式是不使用 while(true)，而是使用 setTimeout 模拟
+                // 或者，在 while 循环中我们无法响应 message。
+                // 修正：使用递归 + setTimeout 是最安全的 Worker 模式
+                
+                if (isRunning) {
+                    setTimeout(calculate, 0);
+                    return; // 结束当前函数执行，等待下一次 event loop
+                }
+            }
+        }
+    </script>
 
     <script>
-        // 获取DOM元素
-        const contentDiv = document.getElementById('pi-content');
+        const contentDiv = document.getElementById('pi-container');
         const countSpan = document.getElementById('count');
+        const timerSpan = document.getElementById('timer');
+        const speedSpan = document.getElementById('speed');
         const btnStart = document.getElementById('btnStart');
         const btnStop = document.getElementById('btnStop');
 
-        // 状态变量
-        let isRunning = false;
+        let worker;
         let totalDigits = 0;
-        
-        // 算法核心变量 (BigInt)
-        // 使用 Jeremy Gibbons 的无界 Spigot 算法 (流式算法)
-        let q = 1n;
-        let r = 0n;
-        let t = 1n;
-        let k = 1n;
-        let n = 3n;
-        let l = 3n;
+        let startTime = 0;
+        let timerInterval;
 
-        function startCalculation() {
-            if (isRunning) return;
-            isRunning = true;
+        // 创建 Worker 的黑魔法 (为了保持单文件)
+        function initWorker() {
+            const workerContent = document.getElementById('worker-code').textContent;
+            const blob = new Blob([workerContent], { type: 'application/javascript' });
+            const workerUrl = URL.createObjectURL(blob);
+            worker = new Worker(workerUrl);
+
+            worker.onmessage = function(e) {
+                if (e.data.type === 'data') {
+                    const digits = e.data.digits;
+                    
+                    // 优化 DOM 操作：使用 createTextNode 比 innerHTML 快
+                    // 每 1000 个字符加一个换行符方便查看（可选，这里直接追加）
+                    contentDiv.insertAdjacentText('beforeend', digits);
+                    
+                    totalDigits += digits.length;
+                    countSpan.innerText = totalDigits.toLocaleString();
+                    
+                    // 自动滚动（如果太快可以去掉这行以节省性能）
+                    // contentDiv.scrollTop = contentDiv.scrollHeight;
+                }
+            };
+        }
+
+        initWorker();
+
+        function startWorker() {
+            if (!startTime) startTime = Date.now();
+            
+            worker.postMessage('start');
             
             btnStart.disabled = true;
-            btnStart.style.opacity = 0.5;
             btnStop.disabled = false;
-            btnStop.style.opacity = 1;
 
-            // 启动循环
-            calculateStep();
-        }
-
-        function stopCalculation() {
-            isRunning = false;
-            btnStart.disabled = false;
-            btnStart.style.opacity = 1;
-            btnStop.disabled = true;
-            btnStop.style.opacity = 0.5;
-        }
-
-        function resetCalculation() {
-            stopCalculation();
-            // 重置算法变量
-            q = 1n; r = 0n; t = 1n; k = 1n; n = 3n; l = 3n;
-            totalDigits = 0;
-            // 重置UI
-            contentDiv.innerHTML = "3.";
-            countSpan.innerText = "0";
-        }
-
-        function calculateStep() {
-            if (!isRunning) return;
-
-            // 每次执行计算一批数字，而不是一个，以平衡 UI 刷新率和计算速度
-            // BigInt 运算随位数增加会变慢，所以我们可以动态调整这个 batchSize，或者固定它
-            const batchSize = 50; 
-            let batchOutput = "";
-
-            for (let i = 0; i < batchSize; i++) {
-                // 算法核心逻辑：
-                // 检查是否产生了一个确定的数字
-                if (4n * q + r - t < n * t) {
-                    // 输出数字 n
-                    batchOutput += n.toString();
-                    totalDigits++;
-
-                    // 更新状态以计算下一位 (相当于乘以10)
-                    let nr = 10n * (r - n * t);
-                    n = ((10n * (3n * q + r)) / t) - 10n * n;
-                    q *= 10n;
-                    r = nr;
-                } else {
-                    // 还没有产生数字，继续迭代级数
-                    let nr = (2n * q + r) * l;
-                    let nn = (q * (7n * k) + 2n + r * l) / (t * l);
-                    q *= k;
-                    t *= l;
-                    l += 2n;
-                    k += 1n;
-                    n = nn;
-                    r = nr;
+            // 更新计时器和速度
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const elapsed = (Date.now() - startTime) / 1000;
+                timerSpan.innerText = elapsed.toFixed(1);
+                if (elapsed > 0) {
+                    speedSpan.innerText = Math.floor(totalDigits / elapsed).toLocaleString();
                 }
-            }
-
-            // 更新 DOM
-            if (batchOutput.length > 0) {
-                // 我们创建一个 span 只是为了给新数字加一点特效，或者直接追加文本
-                // 为了性能，当数字非常多时，直接追加文本节点是最好的
-                contentDiv.insertAdjacentText('beforeend', batchOutput);
-                countSpan.innerText = totalDigits;
-                
-                // 自动滚动到底部
-                // window.scrollTo(0, document.body.scrollHeight);
-            }
-
-            // 使用 setTimeout(..., 0) 让出主线程，允许浏览器渲染UI，然后再继续计算
-            setTimeout(calculateStep, 0);
+            }, 500);
         }
 
-        // 初始化按钮状态
-        btnStop.disabled = true;
-        btnStop.style.opacity = 0.5;
+        function stopWorker() {
+            worker.postMessage('stop');
+            btnStart.disabled = false;
+            btnStop.disabled = true;
+            clearInterval(timerInterval);
+        }
 
+        function copyToClipboard() {
+            const text = contentDiv.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制 ' + totalDigits + ' 位数字到剪贴板');
+            });
+        }
     </script>
 </body>
 </html>
