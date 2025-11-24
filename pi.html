@@ -17,10 +17,8 @@
             height: 100vh;
             overflow: hidden;
         }
-
         h1 { margin: 10px 0; text-shadow: 0 0 10px rgba(0, 255, 65, 0.4); }
         .tag { font-size: 0.8em; background: #222; padding: 2px 8px; border-radius: 4px; color: #fff; margin-bottom: 20px; }
-        
         .controls {
             background: #1a1a1a;
             padding: 20px;
@@ -32,7 +30,6 @@
             align-items: center;
             box-shadow: 0 5px 15px rgba(0,0,0,0.5);
         }
-
         input[type="number"] {
             background: #000;
             border: 1px solid #444;
@@ -42,17 +39,7 @@
             font-size: 16px;
             border-radius: 4px;
         }
-
-        button {
-            padding: 10px 24px;
-            font-size: 16px;
-            cursor: pointer;
-            background-color: #007acc;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-weight: bold;
-        }
+        button { padding: 10px 24px; font-size: 16px; cursor: pointer; background-color: #007acc; color: white; border: none; border-radius: 4px; font-weight: bold; }
         button:hover { background-color: #006bb3; }
         button:disabled { opacity: 0.5; cursor: wait; background-color: #444; }
 
@@ -64,201 +51,182 @@
             max-width: 600px;
             margin-bottom: 10px;
         }
-        
         .stat-card { background: #111; padding: 10px; border-left: 3px solid #007acc; }
         .stat-label { color: #888; font-size: 0.9em; display: block; }
         .stat-value { color: #fff; font-size: 1.2em; font-weight: bold; }
 
         #status-text { height: 20px; color: #ff9800; font-weight: bold; margin-bottom: 5px; }
-
         #result-area {
-            flex: 1;
-            width: 100%;
-            max-width: 1200px;
-            background-color: #000;
-            border: 1px solid #333;
-            padding: 15px;
-            border-radius: 4px;
-            overflow-y: auto;
-            word-wrap: break-word;
-            font-size: 14px;
-            line-height: 1.4;
-            color: #ccc;
+            flex: 1; width: 100%; max-width: 1200px;
+            background-color: #000; border: 1px solid #333; padding: 15px;
+            border-radius: 4px; overflow-y: auto; word-wrap: break-word;
+            font-size: 14px; line-height: 1.4; color: #ccc;
         }
     </style>
 </head>
 <body>
 
-    <h1>&pi; Pi 极速版 (v2)</h1>
-    <span class="tag">Chudnovsky + Smart Sqrt</span>
-    
-    <div class="controls">
-        <label>目标位数: <input type="number" id="targetDigits" value="100000" step="1000"></label>
-        <button id="btnCalc" onclick="startCalc()">立即计算</button>
+<h1>&pi; Pi 极速版 (v2 修复)</h1>
+<span class="tag">Chudnovsky + Safe BigInt</span>
+
+<div class="controls">
+    <label>目标位数: <input type="number" id="targetDigits" value="20000" step="1000"></label>
+    <button id="btnCalc" onclick="startCalc()">立即计算</button>
+</div>
+
+<div id="status-text"></div>
+
+<div class="stats-panel">
+    <div class="stat-card">
+        <span class="stat-label">总耗时</span>
+        <span class="stat-value" id="timeVal">0.00 s</span>
     </div>
-
-    <div id="status-text"></div>
-
-    <div class="stats-panel">
-        <div class="stat-card">
-            <span class="stat-label">总耗时</span>
-            <span class="stat-value" id="timeVal">0.00 s</span>
-        </div>
-        <div class="stat-card">
-            <span class="stat-label">实际结果长度</span>
-            <span class="stat-value" id="lenVal">0</span>
-        </div>
+    <div class="stat-card">
+        <span class="stat-label">实际结果长度</span>
+        <span class="stat-value" id="lenVal">0</span>
     </div>
+</div>
 
-    <div id="result-area">准备就绪...</div>
+<div id="result-area">准备就绪...</div>
 
-    <script id="worker-code" type="javascript/worker">
-        self.onmessage = function(e) {
-            const digits = BigInt(e.data); // 确保是 BigInt
-            
-            try {
-                const startTime = performance.now();
-                const C = 640320n;
-                const C3_OVER_24 = C * C * C / 24n;
-                
-                // 1. 计算项数 (Digits / 14.18)
-                const iterations = Number(digits) / 14.18111561;
-                const limit = BigInt(Math.floor(iterations)) + 1n;
-                
-                self.postMessage({ type: 'status', msg: `正在进行二分分割计算 (项数: ${limit})...` });
+<!-- Worker 代码作为纯文本存放 -->
+<script id="worker-code" type="text/plain">
+self.onmessage = function(e) {
+    const digits = BigInt(e.data);
 
-                // 2. Binary Splitting (Chudnovsky BS)
-                function computeBS(a, b) {
-                    if (b - a === 1n) {
-                        const k = a;
-                        let Pab, Qab, Tab;
-                        
-                        if (k === 0n) {
-                            Pab = 1n;
-                            Qab = 1n;
-                            Tab = 13591409n;
-                        } else {
-                            Pab = (6n*k - 5n) * (2n*k - 1n) * (6n*k - 1n);
-                            Pab = -Pab; // 符号交替
-                            Qab = k * k * k * C3_OVER_24;
-                            Tab = Pab * (545140134n * k + 13591409n);
-                        }
-                        return { P: Pab, Q: Qab, T: Tab };
-                    } 
-                    
-                    const m = (a + b) / 2n;
-                    const left = computeBS(a, m);
-                    const right = computeBS(m, b);
-                    
-                    const P = left.P * right.P;
-                    const Q = left.Q * right.Q;
-                    const T = left.T * right.Q + left.P * right.T;
-                    return { P, Q, T };
+    try {
+        const start = performance.now();
+        const C = 640320n;
+        const C3_OVER_24 = C*C*C / 24n;
+
+        const iterations = Number(digits) / 14.18111561;
+        const limit = BigInt(Math.floor(iterations)) + 1n;
+
+        self.postMessage({type:"status", msg:`二分展开 (项数 ${limit})`});
+
+        function BS(a, b){
+            if(b - a === 1n){
+                const k = a;
+                if(k === 0n){
+                    return {P:1n, Q:1n, T:13591409n};
                 }
-
-                const BS = computeBS(0n, limit);
-                
-                self.postMessage({ type: 'status', msg: '正在计算高精度平方根 (Smart Mode)...' });
-
-                // 3. 优化后的平方根计算
-                const extraPrecision = 20n;
-                const one = 10n ** (digits + extraPrecision);
-                const sqrtBase = 10005n * (one * one);
-                
-                // 【关键修复】提供一个极佳的初始猜测值
-                // sqrt(10005 * 10^2k) 约等于 100 * 10^k
-                // 我们直接从 100 * one 开始猜，而不是从 sqrtBase 开始
-                const initialGuess = 100n * one;
-
-                function sqrtBigInt(n, guess) {
-                    if (n < 2n) return n;
-                    let x0 = guess || n; // 使用 guess
-                    let x1 = (x0 + n / x0) >> 1n;
-                    
-                    // 只要 x1 比 x0 小，就继续（标准牛顿法）
-                    while (x1 < x0) {
-                        x0 = x1;
-                        x1 = (x0 + n / x0) >> 1n;
-                    }
-                    return x0;
-                }
-
-                const sqrtVal = sqrtBigInt(sqrtBase, initialGuess);
-                
-                self.postMessage({ type: 'status', msg: '正在执行最终除法...' });
-                
-                // Chudnovsky 最终公式
-                const finalPi = (426880n * BS.Q * sqrtVal) / BS.T;
-
-                self.postMessage({ type: 'status', msg: '转换文本...' });
-                
-                let piStr = finalPi.toString();
-                piStr = piStr.slice(0, Number(digits) + 1);
-                if (piStr.length > 1) {
-                    piStr = piStr.charAt(0) + "." + piStr.slice(1);
-                }
-
-                const endTime = performance.now();
-                self.postMessage({ type: 'result', pi: piStr, time: (endTime - startTime) });
-
-            } catch (error) {
-                self.postMessage({ type: 'error', msg: error.toString() });
+                const P = -(6n*k - 5n)*(2n*k - 1n)*(6n*k - 1n);
+                const Q = k*k*k * C3_OVER_24;
+                const T = P * (545140134n*k + 13591409n);
+                return {P,Q,T};
             }
-        };
-    </script>
-
-    <script>
-        const workerBlob = new Blob([document.getElementById('worker-code').textContent], { type: 'text/javascript' });
-        const workerUrl = URL.createObjectURL(workerBlob);
-        let worker = null;
-
-        const btnCalc = document.getElementById('btnCalc');
-        const statusText = document.getElementById('status-text');
-        const resultArea = document.getElementById('result-area');
-        const timeVal = document.getElementById('timeVal');
-        const lenVal = document.getElementById('lenVal');
-
-        function startCalc() {
-            const digits = parseInt(document.getElementById('targetDigits').value);
-            
-            if (digits > 10000000) {
-                alert("位数过大，可能会导致崩溃。建议先试 100万位。");
-                return;
-            }
-
-            if (worker) worker.terminate();
-            worker = new Worker(workerUrl);
-
-            btnCalc.disabled = true;
-            resultArea.innerText = "正在初始化...";
-            statusText.innerText = "启动 Worker...";
-            resultArea.style.opacity = 0.5;
-
-            // 发送数据
-            worker.postMessage(digits);
-
-            worker.onmessage = function(e) {
-                const data = e.data;
-                if (data.type === 'status') {
-                    statusText.innerText = data.msg;
-                } else if (data.type === 'result') {
-                    statusText.innerText = "计算完成";
-                    timeVal.innerText = (data.time / 1000).toFixed(3) + " s";
-                    resultArea.style.opacity = 1;
-                    resultArea.innerText = data.pi;
-                    lenVal.innerText = (data.pi.length - 2).toLocaleString(); 
-                    btnCalc.disabled = false;
-                } else if (data.type === 'error') {
-                    statusText.innerText = "错误: " + data.msg;
-                    btnCalc.disabled = false;
-                }
+            const m = (a+b)/2n;
+            const L = BS(a,m);
+            const R = BS(m,b);
+            return {
+                P: L.P*R.P,
+                Q: L.Q*R.Q,
+                T: L.T*R.Q + L.P*R.T
             };
-            
-            worker.onerror = function(e) {
-                statusText.innerText = "Worker Error: " + e.message;
-                btnCalc.disabled = false;
-            }
         }
-    </script>
+
+        const S = BS(0n, limit);
+
+        self.postMessage({type:"status", msg:"准备 sqrt..."});
+
+        const extra = 20n;
+        const total = digits + extra;
+
+        // 安全构造 10^n
+        function pow10(n){
+            return BigInt("1" + "0".repeat(Number(n)));
+        }
+
+        const M = pow10(total);
+        const sqrtBase = 10005n * (M*M);
+
+        // sqrt 初值
+        let guess = 100n * M;
+
+        function sqrtBig(n, x){
+            let x0 = x;
+            let x1 = (x0 + n/x0) >> 1n;
+            while(x1 < x0){
+                x0 = x1;
+                x1 = (x0 + n/x0) >> 1n;
+            }
+            return x0;
+        }
+
+        const s = sqrtBig(sqrtBase, guess);
+
+        self.postMessage({type:"status", msg:"最终计算 π ..."});
+
+        const pi = (426880n * S.Q * s) / S.T;
+
+        let str = pi.toString();
+        str = str.slice(0, Number(digits)+1);
+        if(str.length>1) str = str[0]+"."+str.slice(1);
+
+        const end = performance.now();
+
+        self.postMessage({
+            type:"result",
+            pi:str,
+            time:end-start
+        });
+
+    } catch(err){
+        self.postMessage({type:"error", msg:err.message});
+    }
+};
+</script>
+
+<script>
+const blob = new Blob([document.getElementById("worker-code").textContent], {
+    type: "text/javascript"
+});
+const workerURL = URL.createObjectURL(blob);
+
+let worker = null;
+
+const btnCalc = document.getElementById("btnCalc");
+const statusText = document.getElementById("status-text");
+const resultArea = document.getElementById("result-area");
+const timeVal = document.getElementById("timeVal");
+const lenVal = document.getElementById("lenVal");
+
+function startCalc(){
+    const digits = parseInt(document.getElementById("targetDigits").value);
+
+    if(worker) worker.terminate();
+    worker = new Worker(workerURL);
+
+    btnCalc.disabled = true;
+    statusText.innerText = "启动 Worker...";
+    resultArea.innerText = "计算中...";
+    resultArea.style.opacity = 0.5;
+
+    worker.postMessage(digits);
+
+    worker.onmessage = function(e){
+        const d = e.data;
+
+        if(d.type === "status"){
+            statusText.innerText = d.msg;
+        } else if(d.type === "result"){
+            statusText.innerText = "完成";
+            timeVal.innerText = (d.time/1000).toFixed(3)+" s";
+            resultArea.style.opacity = 1;
+            resultArea.innerText = d.pi;
+            lenVal.innerText = (d.pi.length - 2);
+            btnCalc.disabled = false;
+        } else if(d.type === "error"){
+            statusText.innerText = "错误: "+d.msg;
+            btnCalc.disabled = false;
+        }
+    };
+
+    worker.onerror = e=>{
+        statusText.innerText = "Worker Err: "+e.message;
+        btnCalc.disabled = false;
+    };
+}
+</script>
 </body>
 </html>
