@@ -1,302 +1,191 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Pi 极速（可尝试大位数）</title>
-<style>
-  :root{--bg:#0d0d0d;--txt:#00ff41;--panel:#1a1a1a}
-  body{font-family:Courier,monospace;background:var(--bg);color:var(--txt);margin:0;padding:20px;display:flex;flex-direction:column;gap:12px;min-height:100vh}
-  h1{margin:0 0 6px 0;text-shadow:0 0 12px rgba(0,255,65,.3)}
-  .tag{font-size:.85rem;background:#222;padding:3px 8px;border-radius:6px;color:#fff;display:inline-block}
-  .controls{background:var(--panel);padding:12px;border-radius:8px;border:1px solid #333;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  input[type="number"]{background:#000;border:1px solid #444;color:#fff;padding:8px;border-radius:4px;width:140px}
-  button{padding:8px 14px;border-radius:6px;border:none;background:#007acc;color:#fff;cursor:pointer;font-weight:700}
-  button:disabled{opacity:.5;cursor:wait;background:#444}
-  #status{color:#ffb74d;font-weight:700;height:20px}
-  .stats{display:flex;gap:12px;flex-wrap:wrap}
-  .card{background:#111;padding:10px;border-left:4px solid #007acc;border-radius:6px}
-  #result{flex:1;background:#000;border:1px solid #333;padding:12px;border-radius:6px;color:#ccc;overflow:auto;white-space:pre-wrap;font-size:13px;line-height:1.4;max-height:45vh}
-  .note{color:#aaa;font-size:.9rem}
-  a.download{color:#00bcd4}
-</style>
-</head>
-<body>
-  <h1>π 极速（尝试大位数）</h1>
-  <span class="tag">Chudnovsky · Binary-splitting · Worker</span>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi 极速计算器 (修复完美版)</title>
 
-  <div class="controls">
-    <label>位数（小数位）: <input id="digits" type="number" value="20000" step="1000" min="10" max="1000000"></label>
-    <button id="startBtn">立即计算</button>
-    <button id="cancelBtn" disabled>取消</button>
-    <button id="downloadBtn" disabled>导出结果</button>
-    <span class="note" id="warn"></span>
-  </div>
-
-  <div id="status">准备就绪</div>
-
-  <div class="stats">
-    <div class="card"><div class="label">耗时</div><div id="timeVal">0.00 s</div></div>
-    <div class="card"><div class="label">输出长度</div><div id="lenVal">0</div></div>
-    <div class="card"><div class="label">最大建议</div><div id="suggest">推荐 ≤ 200k（浏览器友好）</div></div>
-  </div>
-
-  <div id="result">准备就绪...</div>
-
-  <!-- Worker 脚本文本（不会直接执行） -->
-  <script id="worker-src" type="text/plain">
-/*
-  Worker: 负责下面任务（接收数字 digits）
-  主要改动：
-  - 叶节点先生成数组，再迭代两两合并 (避免递归)
-  - pow10 用字符串拼接
-  - 提供阶段性 postMessage('progress', pct, msg)
-  - 结果以字符串返回
-*/
-self.onmessage = function(e){
-  const digits = BigInt(e.data.digits);
-  const maxTry = Number(e.data.maxTry ?? 1000000);
-  const startTime = performance.now();
-
-  try{
-    // basic limits and params
-    const C = 640320n;
-    const C3_OVER_24 = C*C*C / 24n;
-    const extra = 20n;
-    const total = digits + extra;
-
-    function postStatus(msg, pct){
-      self.postMessage({type:'status', msg:msg, progress:pct ?? null});
-    }
-
-    // iterations needed (Chudnovsky: ~14.1816 digits per term)
-    const iterations = Math.max(1, Math.ceil(Number(digits) / 14.18111561));
-    const nIter = BigInt(iterations);
-
-    postStatus(`准备生成 ${iterations} 个叶节点...`, 1);
-
-    // pow10 via string
-    function pow10Big(n){
-      if(n < 0n) return 1n;
-      // guard: convert to Number only when safe for repeat argument
-      const nn = Number(n);
-      return BigInt("1" + "0".repeat(nn));
-    }
-
-    // create leaf nodes [ {P,Q,T} ]
-    const leaves = [];
-    for(let k = 0n; k < nIter; k++){
-      if(k === 0n){
-        leaves.push({P:1n, Q:1n, T:13591409n});
-      } else {
-        const P = (6n*k - 5n)*(2n*k - 1n)*(6n*k - 1n);
-        const Q = k*k*k * C3_OVER_24;
-        const T = P * (545140134n*k + 13591409n);
-        leaves.push({P, Q, T});
-      }
-      if(Number(k) % 1000 === 0) postStatus(`生成叶节点 ${Number(k)+1}/${iterations} ...`, Math.floor(Number(k)/iterations*50));
-    }
-
-    postStatus('开始两两合并（二分合并）...', 50);
-
-    // merge function
-    function merge(a,b){
-      return {
-        P: a.P * b.P,
-        Q: a.Q * b.Q,
-        T: a.T * b.Q + a.P * b.T
-      };
-    }
-
-    // iterative pairwise merge until one remains
-    let round = 0;
-    while(leaves.length > 1){
-      const next = [];
-      for(let i=0;i<leaves.length;i+=2){
-        if(i+1 < leaves.length){
-          next.push(merge(leaves[i], leaves[i+1]));
-        } else {
-          next.push(leaves[i]);
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
         }
-      }
-      leaves.length = 0; // free
-      Array.prototype.push.apply(leaves, next);
-      round++;
-      if(round % 1 === 0){
-        const pct = 50 + Math.floor((1 - 1/Math.pow(2, round)) * 40);
-        postStatus(`合并轮次 ${round}, 剩余项 ${leaves.length}`, pct);
-      }
+        #result-area {
+            white-space: pre-wrap;
+            background: #111;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #333;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .controls {
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>π 计算器（Chudnovsky / 修复版）</h1>
+
+<div class="controls">
+    目标位数：
+    <input id="digits" type="number" value="2000" step="100">
+    <button onclick="start()">开始计算</button>
+</div>
+
+<div id="status"></div>
+
+<div id="result-area">等待中...</div>
+
+<script id="worker-code" type="javascript/worker">
+
+// ========== Worker 内代码 ==========
+
+function pow10(n) {
+    return BigInt("1" + "0".repeat(Number(n)));
+}
+
+self.onmessage = function (e) {
+    const digits = BigInt(e.data);
+    const startTime = performance.now();
+
+    try {
+        const C = 640320n;
+        const C3_24 = C * C * C / 24n;
+
+        const iterations = Number(digits) / 14.181647462725477;
+        const nIter = BigInt(Math.floor(iterations)) + 1n;
+
+        postMessage({ type: "status", msg: "生成叶节点..." });
+
+        // ====== 生成叶节点 ======
+        let terms = [];
+        for (let k = 0n; k < nIter; k++) {
+            if (k === 0n) {
+                terms.push({ P: 1n, Q: 1n, T: 13591409n });
+            } else {
+                const P = (6n * k - 5n) * (2n * k - 1n) * (6n * k - 1n);
+                const Q = k * k * k * C3_24;
+                const term = 545140134n * k + 13591409n;
+
+                const sign = (k % 2n === 1n) ? -1n : 1n; // 正确的 (-1)^k
+                const T = sign * P * term;
+
+                terms.push({ P, Q, T });
+            }
+        }
+
+        postMessage({ type: "status", msg: "二分合并中..." });
+
+        // ====== 二分拆分合并 ======
+        while (terms.length > 1) {
+            let next = [];
+            for (let i = 0; i < terms.length; i += 2) {
+                if (i + 1 >= terms.length) {
+                    next.push(terms[i]);
+                } else {
+                    const A = terms[i];
+                    const B = terms[i + 1];
+                    next.push({
+                        P: A.P * B.P,
+                        Q: A.Q * B.Q,
+                        T: A.T * B.Q + A.P * B.T
+                    });
+                }
+            }
+            terms = next;
+        }
+
+        const BS = terms[0];
+
+        postMessage({ type: "status", msg: "计算 sqrt..." });
+
+        // ====== sqrt(10005 * 10^(2*(digits+extra))) ======
+        const extra = 20n;
+        const total = digits + extra;
+
+        const bigN = BigInt("10005" + "0".repeat(Number(2n * total)));
+        const initial = 100n * pow10(total);
+
+        function bigSqrt(n, x0) {
+            let x = x0;
+            let y = (x + n / x) >> 1n;
+            while (y < x) {
+                x = y;
+                y = (x + n / x) >> 1n;
+            }
+            return x;
+        }
+
+        const sqrtVal = bigSqrt(bigN, initial);
+
+        postMessage({ type: "status", msg: "最终除法..." });
+
+        // ========== Chudnovsky 公式 ==========
+        let piInt = (426880n * BS.Q * sqrtVal) / BS.T;
+
+        // ========== 去 extra 精度（关键修复） ==========
+        piInt = piInt / pow10(extra);
+
+        // 转字符串并插入小数点
+        let out = piInt.toString();
+        out = out[0] + "." + out.slice(1);
+
+        const time = ((performance.now() - startTime) / 1000).toFixed(3);
+
+        postMessage({ type: "result", pi: out, time });
+
+    } catch (err) {
+        postMessage({ type: "error", msg: err.toString() });
     }
-
-    const BS = leaves[0];
-
-    postStatus('准备计算 sqrt(10005) * 10^total 的整数表示...', 92);
-
-    // compute sqrt(10005 * 10^(2*total)) == floor( sqrt(10005) * 10^total )
-    // construct big integer: "10005" + (2*total) zeros
-    const zeros = "0".repeat(Number(2n * total)); // may throw if too large
-    const bigStr = "10005" + zeros;
-    const bigN = BigInt(bigStr);
-
-    // initial guess: 10^total * 100  (a safe overestimate)
-    const guess = BigInt("1" + "0".repeat(Number(total))) * 100n;
-
-    function bigintSqrt(n, x0){
-      if(n < 2n) return n;
-      let x = x0;
-      let y = (x + n / x) >> 1n;
-      while(y < x){
-        x = y;
-        y = (x + n / x) >> 1n;
-      }
-      return x;
-    }
-
-    const sqrtVal = bigintSqrt(bigN, guess);
-
-    postStatus('执行最终乘除，生成 π...', 96);
-
-    const numerator = 426880n * BS.Q * sqrtVal;
-    const piInt = numerator / BS.T; // integer approx of pi * 10^(digits+extra?) depends on scaling
-
-    // format: convert to string, trim to requested digits
-    let piStr = piInt.toString();
-    // The piInt currently equals floor(pi * 10^digits) if scaling matches.
-    // We used sqrt(10005*10^(2*total)) so piInt has extra digits = extra
-    // Trim trailing extra digits:
-    if(piStr.length > Number(digits) + Number(extra)){
-      piStr = piStr.slice(0, piStr.length - Number(extra));
-    }
-    // ensure length at least digits+1
-    if(piStr.length < Number(digits) + 1){
-      // pad with zeros (rare)
-      piStr = piStr + "0".repeat(Number(digits) + 1 - piStr.length);
-    }
-
-    // make "3.xxxxxx"
-    piStr = piStr.slice(0,1) + "." + piStr.slice(1);
-
-    const endTime = performance.now();
-    postStatus('完成', 100);
-    self.postMessage({type:'result', pi:piStr, time:(endTime - startTime)});
-  }catch(err){
-    self.postMessage({type:'error', msg:err && err.message ? err.message : String(err)});
-  }
 };
-  </script>
+
+</script>
+
 
 <script>
-  // UI glue
-  const startBtn = document.getElementById('startBtn');
-  const cancelBtn = document.getElementById('cancelBtn');
-  const downloadBtn = document.getElementById('downloadBtn');
-  const digitsInput = document.getElementById('digits');
-  const status = document.getElementById('status');
-  const result = document.getElementById('result');
-  const timeVal = document.getElementById('timeVal');
-  const lenVal = document.getElementById('lenVal');
-  const warn = document.getElementById('warn');
-  const suggest = document.getElementById('suggest');
+let worker = null;
 
-  // default suggestions
-  const SAFE_RECOMMEND = 200000; // 推荐上限（大多数浏览器）
-  suggest.innerText = `推荐 ≤ ${SAFE_RECOMMEND.toLocaleString()}（浏览器友好）`;
+function start() {
+    const digits = parseInt(document.getElementById("digits").value);
+    const status = document.getElementById("status");
+    const output = document.getElementById("result-area");
 
-  let worker = null;
-  let lastPiStr = null;
-
-  function makeWorker(){
-    const src = document.getElementById('worker-src').textContent;
-    const blob = new Blob([src], {type:'text/javascript'});
-    const url = URL.createObjectURL(blob);
-    return new Worker(url);
-  }
-
-  startBtn.addEventListener('click', ()=>{
-    const digits = Number(digitsInput.value);
-    if(!Number.isFinite(digits) || digits < 1){
-      alert('请输入有效位数（正整数）');
-      return;
+    if (digits > 50000) {
+        alert("浏览器跑太大的位数会爆内存，建议 ≤ 50000。");
+        return;
     }
 
-    // warnings
-    if(digits > SAFE_RECOMMEND){
-      warn.innerText = `注意：你选择 ${digits.toLocaleString()} 位，浏览器可能会耗尽内存或长时间无响应。建议先尝试 ≤ ${SAFE_RECOMMEND.toLocaleString()}。`;
-    } else {
-      warn.innerText = '';
-    }
+    if (worker) worker.terminate();
 
-    startBtn.disabled = true;
-    cancelBtn.disabled = false;
-    downloadBtn.disabled = true;
-    result.innerText = 'Worker 初始化...';
-    status.innerText = '启动 Worker';
+    const blob = new Blob(
+        [document.getElementById("worker-code").textContent],
+        { type: "text/javascript" }
+    );
+    worker = new Worker(URL.createObjectURL(blob));
 
-    worker = makeWorker();
+    status.innerText = "启动中...";
+    output.innerText = "计算中...";
 
-    worker.onmessage = function(e){
-      const d = e.data;
-      if(d.type === 'status'){
-        status.innerText = d.msg + (d.progress ? ` (${d.progress}%)` : '');
-      } else if(d.type === 'result'){
-        const ms = d.time;
-        timeVal.innerText = (ms/1000).toFixed(3) + ' s';
-        lastPiStr = d.pi;
-        result.innerText = d.pi;
-        lenVal.innerText = (d.pi.length - 2).toLocaleString();
-        status.innerText = '完成';
-        startBtn.disabled = false;
-        cancelBtn.disabled = true;
-        downloadBtn.disabled = false;
-        worker.terminate();
-        worker = null;
-      } else if(d.type === 'error'){
-        status.innerText = '错误: ' + d.msg;
-        result.innerText = '错误：' + d.msg;
-        startBtn.disabled = false;
-        cancelBtn.disabled = true;
-        downloadBtn.disabled = true;
-        if(worker){ worker.terminate(); worker = null; }
-      }
+    worker.postMessage(digits);
+
+    worker.onmessage = function (e) {
+        const data = e.data;
+        if (data.type === "status") {
+            status.innerText = data.msg;
+        } else if (data.type === "result") {
+            status.innerText = "完成，用时 " + data.time + " 秒";
+            output.innerText = data.pi;
+        } else if (data.type === "error") {
+            status.innerText = "错误： " + data.msg;
+        }
     };
-
-    worker.onerror = function(e){
-      status.innerText = 'Worker 异常: ' + e.message;
-      result.innerText = 'Worker 异常: ' + e.message;
-      startBtn.disabled = false;
-      cancelBtn.disabled = true;
-      downloadBtn.disabled = true;
-      if(worker){ worker.terminate(); worker = null; }
-    };
-
-    // send digits and maxTry hint
-    worker.postMessage({digits: digits, maxTry: 1000000});
-  });
-
-  cancelBtn.addEventListener('click', ()=>{
-    if(worker){
-      worker.terminate();
-      worker = null;
-      status.innerText = '已取消';
-      result.innerText = '已取消';
-      startBtn.disabled = false;
-      cancelBtn.disabled = true;
-      downloadBtn.disabled = !!lastPiStr ? false : true;
-    }
-  });
-
-  downloadBtn.addEventListener('click', ()=>{
-    if(!lastPiStr) return;
-    const blob = new Blob([lastPiStr], {type:'text/plain;charset=utf-8'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pi_${digitsInput.value}_digits.txt`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
+}
 </script>
+
 </body>
 </html>
