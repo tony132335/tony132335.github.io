@@ -278,9 +278,25 @@
 
                 <div class="border-t pt-4">
                      <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">備份文件</label>
-                     <button onclick="downloadJson()" class="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 rounded-lg transition flex items-center justify-center">
+                     <button onclick="downloadJson()" class="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 rounded-lg transition flex items-center justify-center mb-2">
                         <i class="fa-solid fa-file-code mr-2"></i> 下載 .json 檔案
                      </button>
+                </div>
+
+                <!-- JSON 導入區塊 -->
+                <div class="border-t pt-4">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">導入備份 (覆蓋當前)</label>
+                    <div class="flex gap-2">
+                        <label class="flex-1 cursor-pointer border border-dashed border-gray-300 hover:bg-gray-50 hover:border-blue-400 rounded-lg p-2 text-center transition flex items-center justify-center gap-2 text-sm text-gray-600">
+                            <i class="fa-solid fa-upload"></i>
+                            <span id="importFileName">選擇 .json 檔案</span>
+                            <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="handleFileSelect(this)">
+                        </label>
+                        <button onclick="confirmImport()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition" id="importBtn" disabled>
+                            導入
+                        </button>
+                    </div>
+                    <p class="text-xs text-red-400 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 注意：導入將直接覆蓋您當前所有設定。</p>
                 </div>
             </div>
 
@@ -297,8 +313,6 @@
         async function callGemini(prompt, isJson = false) {
             if (!apiKey) {
                 console.warn("API Key not found, using mock response if possible or failing gracefully.");
-                // In a real deployed environment without the immersive wrapper, this would fail.
-                // For this demo, we assume the environment handles it.
             }
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
@@ -367,6 +381,7 @@
 
         let appData = null;
         let editingDayKey = null; 
+        let pendingImportData = null; // 暫存導入的資料
 
         // --- 初始化與 URL 同步 ---
         window.onload = function() {
@@ -834,6 +849,12 @@
         function openShare() {
             document.getElementById('shareModal').classList.remove('hidden');
             generateShareLink();
+            
+            // 重置導入狀態
+            document.getElementById('importFileInput').value = '';
+            document.getElementById('importFileName').innerText = '選擇 .json 檔案';
+            document.getElementById('importBtn').disabled = true;
+            pendingImportData = null;
         }
 
         function generateShareLink() {
@@ -858,6 +879,47 @@
             document.body.appendChild(downloadAnchorNode);
             downloadAnchorNode.click();
             downloadAnchorNode.remove();
+        }
+
+        // --- JSON 文件導入邏輯 ---
+
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (file) {
+                document.getElementById('importFileName').innerText = file.name;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        // 基本驗證
+                        if (json.schedules && json.settings) {
+                            pendingImportData = json;
+                            document.getElementById('importBtn').disabled = false;
+                        } else {
+                            alert("檔案格式錯誤：找不到必要的 schedules 或 settings 欄位");
+                            input.value = ''; 
+                            document.getElementById('importFileName').innerText = "選擇 .json 檔案";
+                            document.getElementById('importBtn').disabled = true;
+                        }
+                    } catch (err) {
+                        alert("無法解析 JSON 文件，請確認檔案格式正確。");
+                        console.error(err);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function confirmImport() {
+            if (pendingImportData) {
+                if(confirm("確定要導入此備份嗎？這將覆蓋您當前的所有課程表設定，且無法復原。")) {
+                    appData = pendingImportData;
+                    localStorage.setItem('schoolTimetableConfig', JSON.stringify(appData));
+                    // 刷新頁面以應用新設定
+                    location.reload(); 
+                }
+            }
         }
 
     </script>
