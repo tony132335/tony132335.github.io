@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi 计算器 - Web Worker 多线程版</title>
+    <title>Pi 极速计算器 (Chudnovsky算法)</title>
     <style>
         body {
             font-family: 'Courier New', Courier, monospace;
@@ -20,46 +20,81 @@
 
         h1 {
             margin: 10px 0;
-            font-size: 24px;
-            text-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+            text-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+        }
+        
+        .tag {
+            font-size: 0.8em;
+            background: #222;
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: #fff;
+            margin-bottom: 20px;
         }
 
         .controls {
-            background: #222;
-            padding: 15px;
+            background: #1a1a1a;
+            padding: 20px;
             border-radius: 8px;
             margin-bottom: 15px;
             display: flex;
-            gap: 10px;
+            gap: 15px;
             border: 1px solid #333;
-            z-index: 10;
+            align-items: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        }
+
+        input[type="number"] {
+            background: #000;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 10px;
+            font-family: inherit;
+            width: 120px;
+            font-size: 16px;
+            border-radius: 4px;
         }
 
         button {
-            padding: 10px 20px;
+            padding: 10px 24px;
             font-size: 16px;
             cursor: pointer;
             background-color: #007acc;
             color: white;
             border: none;
             border-radius: 4px;
-            transition: transform 0.1s;
+            font-weight: bold;
+            transition: all 0.2s;
         }
+        button:hover { background-color: #006bb3; box-shadow: 0 0 10px rgba(0, 122, 204, 0.5); }
+        button:disabled { opacity: 0.5; cursor: wait; }
 
-        button:active { transform: scale(0.95); }
-        button.stop { background-color: #d32f2f; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-
-        .stats {
-            display: flex;
-            gap: 30px;
+        .stats-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 600px;
             margin-bottom: 10px;
-            font-size: 14px;
-            color: #aaa;
         }
-        .stat-val { color: #fff; font-weight: bold; font-size: 1.2em; }
+        
+        .stat-card {
+            background: #111;
+            padding: 10px;
+            border-left: 3px solid #007acc;
+        }
+        
+        .stat-label { color: #888; font-size: 0.9em; display: block; }
+        .stat-value { color: #fff; font-size: 1.2em; font-weight: bold; }
 
-        #pi-container {
+        #status-text {
+            height: 20px;
+            color: #ff9800;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        #result-area {
             flex: 1;
             width: 100%;
             max-width: 1200px;
@@ -67,179 +102,281 @@
             border: 1px solid #333;
             padding: 15px;
             border-radius: 4px;
-            overflow-y: auto; /* 允许垂直滚动 */
+            overflow-y: auto;
             word-wrap: break-word;
-            font-size: 16px;
+            font-size: 14px;
             line-height: 1.4;
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            color: #ccc;
         }
         
-        /* 滚动条样式 */
-        #pi-container::-webkit-scrollbar { width: 10px; }
-        #pi-container::-webkit-scrollbar-track { background: #111; }
-        #pi-container::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
-        #pi-container::-webkit-scrollbar-thumb:hover { background: #555; }
+        .first-digits { color: #fff; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>&pi; Pi 终极计算器 (Web Worker)</h1>
+    <h1>&pi; Pi 极速版</h1>
+    <span class="tag">Kernel: Chudnovsky Binary Splitting</span>
     
     <div class="controls">
-        <button id="btnStart" onclick="startWorker()">启动引擎</button>
-        <button id="btnStop" class="stop" onclick="stopWorker()" disabled>停止</button>
-        <button onclick="copyToClipboard()">复制结果</button>
+        <label>
+            目标位数:
+            <input type="number" id="targetDigits" value="100000" min="100" max="5000000" step="1000">
+        </label>
+        <button id="btnCalc" onclick="startCalc()">立即计算</button>
     </div>
 
-    <div class="stats">
-        <div>已计算位数: <span id="count" class="stat-val">0</span></div>
-        <div>耗时: <span id="timer" class="stat-val">0.0</span> s</div>
-        <div>速度: <span id="speed" class="stat-val">0</span> 位/秒</div>
+    <div id="status-text"></div>
+
+    <div class="stats-panel">
+        <div class="stat-card">
+            <span class="stat-label">总耗时</span>
+            <span class="stat-value" id="timeVal">0.00 s</span>
+        </div>
+        <div class="stat-card">
+            <span class="stat-label">实际结果长度</span>
+            <span class="stat-value" id="lenVal">0</span>
+        </div>
     </div>
 
-    <div id="pi-container">3.</div>
+    <div id="result-area">准备就绪...</div>
 
     <script id="worker-code" type="javascript/worker">
-        let isRunning = false;
-        
-        // 算法状态
-        let q = 1n, r = 0n, t = 1n, k = 1n, n = 3n, l = 3n;
-        
         self.onmessage = function(e) {
-            if (e.data === 'start') {
-                isRunning = true;
-                calculate();
-            } else if (e.data === 'stop') {
-                isRunning = false;
-            } else if (e.data === 'reset') {
-                isRunning = false;
-                q = 1n; r = 0n; t = 1n; k = 1n; n = 3n; l = 3n;
+            const digits = e.data;
+            try {
+                const startTime = performance.now();
+                
+                // Chudnovsky 算法常数
+                const C = 640320n;
+                const C3_OVER_24 = C * C * C / 24n;
+                
+                // 1. 确定迭代次数
+                // Chudnovsky 每项收敛约 14.18 位
+                const iterations = Math.floor(digits / 14.18111561) + 1;
+                
+                self.postMessage({ type: 'status', msg: `正在进行二分分割计算 (Terms: ${iterations})...` });
+
+                // 2. 二分分割 (Binary Splitting) - 递归计算 P, Q, T
+                function binarySplit(a, b) {
+                    if (b - a === 1n) {
+                        // 基本情况
+                        const Pab = (6n * a - 5n) * (2n * a - 1n) * (6n * a - 1n);
+                        const Qab = a * a * a * C3_OVER_24;
+                        const Tab = Pab * (545140134n * a + 13591409n);
+                        
+                        // 处理 k=0 的特殊情况
+                        if (a === 0n) {
+                            return { P: 1n, Q: 1n, T: 13591409n };
+                        }
+                        return { P: Pab, Q: Qab, T: Tab }; // 注意：这里 T 包含了负号逻辑，我们在合并时处理
+                    } else {
+                        // 递归分割
+                        const m = (a + b) / 2n;
+                        const left = binarySplit(a, m);
+                        const right = binarySplit(m, b);
+                        
+                        // 合并公式
+                        // P = P_left * P_right
+                        // Q = Q_left * Q_right
+                        // T = T_left * Q_right + P_left * T_right (注意符号交替已经在基本项公式隐含处理，或者需要在这里显式处理)
+                        
+                        // 更正的标准 Chudnovsky BS 公式：
+                        // 对于 (-1)^k ...
+                        // 我们在基本情况里：若 k=0, 正. 
+                        // 公式通常写为: 
+                        // P(a,b) = P(a,m) * P(m,b)
+                        // Q(a,b) = Q(a,m) * Q(m,b)
+                        // T(a,b) = T(a,m) * Q(m,b) + P(a,m) * T(m,b) 
+                        // *但是在 Chudnovsky 中，T 部分的符号是 (-1)^k，通常通过 P 的符号控制*
+                        // 这里的简单实现使用了修正后的 Pab 公式：
+                        // Pab = -(6k-5)(2k-1)(6k-1)  <-- 包含负号
+                        
+                        // 让我们使用经过验证的简化版 BS 逻辑:
+                        
+                        const P = left.P * right.P;
+                        const Q = left.Q * right.Q;
+                        const T = left.T * right.Q + left.P * right.T;
+                        
+                        return { P, Q, T };
+                    }
+                }
+
+                // 修正 Base Case 以匹配标准实现
+                function computeBS(a, b) {
+                    if (b - a === 1n) {
+                        const k = b; // 使用 upper bound 作为 k (除了 0)
+                        if (k === 1n) {
+                            // k=0 项实际上是在主公式处理，还是这里？
+                            // 让我们从 k=0 开始
+                        }
+                        // 实际上大多实现从 k=1 到 n，k=0 单独加
+                        // 这里我们使用区间 [a, b)
+                        
+                        let Pab, Qab, Tab;
+                        
+                        if (a === 0n) {
+                            Pab = 1n;
+                            Qab = 1n;
+                            Tab = 13591409n;
+                        } else {
+                            const k = a;
+                            // P_k = (6k-5)(2k-1)(6k-1)
+                            // 并在奇数项引入负号，或者直接在 sum 中减
+                            // 为了简单，我们将 (-1)^k 放入 Pab
+                            Pab = (6n*k - 5n) * (2n*k - 1n) * (6n*k - 1n);
+                            Pab = -Pab; // 符号交替
+                            
+                            Qab = k * k * k * C3_OVER_24;
+                            Tab = Pab * (545140134n * k + 13591409n);
+                        }
+                        return { P: Pab, Q: Qab, T: Tab };
+                    } 
+                    
+                    const m = (a + b) / 2n;
+                    const left = computeBS(a, m);
+                    const right = computeBS(m, b);
+                    
+                    const P = left.P * right.P;
+                    const Q = left.Q * right.Q;
+                    const T = left.T * right.Q + left.P * right.T;
+                    return { P, Q, T };
+                }
+
+                // 执行 BS
+                const BS = computeBS(0n, BigInt(iterations));
+                
+                self.postMessage({ type: 'status', msg: '正在计算高精度平方根...' });
+
+                // 3. 计算最终结果
+                // Pi = (Q * 426880 * sqrt(10005)) / T
+                // 需要高精度 sqrt
+                
+                // 预留额外的精度位数以防舍入误差
+                const extraPrecision = 20n; 
+                const scale = 10n ** (BigInt(digits) + extraPrecision);
+                
+                // 计算 sqrt(10005 * scale^2) = sqrt(10005) * scale
+                // 使用牛顿迭代法求 sqrt(10005 * 10^(2*digits))
+                
+                function sqrtBigInt(n) {
+                    if (n < 0n) throw 'Negative sqrt';
+                    if (n < 2n) return n;
+                    
+                    let x0 = n;
+                    let x1 = (x0 + n / x0) >> 1n;
+                    
+                    while (x1 < x0) {
+                        x0 = x1;
+                        x1 = (x0 + n / x0) >> 1n;
+                    }
+                    return x0;
+                }
+
+                // 为了保持精度，先乘 scale 再除
+                // Pi = (Q * 426880 * sqrt(10005)) / T
+                // 变形为: (Q * 426880 * sqrt(10005 * 10^(2*N))) / (T * 10^N) ?
+                // 或者是: (Q * 426880 * sqrt(10005) * 10^N) / T
+                
+                const one = 10n ** (BigInt(digits) + extraPrecision);
+                const sqrtBase = 10005n * (one * one); // 放大以便开方后保留小数
+                const sqrtVal = sqrtBigInt(sqrtBase);
+                
+                self.postMessage({ type: 'status', msg: '正在执行最终除法...' });
+                
+                const numer = BS.Q * 426880n * sqrtVal;
+                const denom = BS.T * one; // 因为 sqrtVal 已经包含了 scale，这里调整分母
+                // 修正公式:
+                // Pi ~= 426880 * sqrt(10005) * Q / T
+                // Numer = 426880 * (sqrt(10005) * scale) * Q
+                // Denom = T * scale ? No.
+                
+                // 让我们直接点：
+                // Val = (426880 * Q * sqrt(10005 * 10^(2N))) / T
+                // 结果直接是整数形式的 Pi
+                
+                const finalPi = (426880n * BS.Q * sqrtVal) / BS.T;
+
+                self.postMessage({ type: 'status', msg: '转换结果为文本...' });
+                
+                let piStr = finalPi.toString();
+                // 截取所需位数
+                piStr = piStr.slice(0, digits + 1); // +1 是因为 "3" 算一位
+                
+                // 插入小数点
+                if (piStr.length > 1) {
+                    piStr = piStr.charAt(0) + "." + piStr.slice(1);
+                }
+
+                const endTime = performance.now();
+                
+                self.postMessage({ 
+                    type: 'result', 
+                    pi: piStr, 
+                    time: (endTime - startTime) 
+                });
+
+            } catch (e) {
+                self.postMessage({ type: 'error', msg: e.toString() });
             }
         };
-
-        function calculate() {
-            // 每次处理的时间片 (毫秒)
-            // Worker 里可以把这个值设大一点，因为它不影响 UI
-            const TIME_SLICE = 50; 
-            
-            while (isRunning) {
-                const startTime = performance.now();
-                let batchDigits = "";
-                let iterations = 0;
-
-                // 在 TIME_SLICE 时间内尽可能多算
-                while (performance.now() - startTime < TIME_SLICE) {
-                    if (4n * q + r - t < n * t) {
-                        batchDigits += n.toString();
-                        
-                        let nr = 10n * (r - n * t);
-                        n = ((10n * (3n * q + r)) / t) - 10n * n;
-                        q *= 10n;
-                        r = nr;
-                    } else {
-                        let nr = (2n * q + r) * l;
-                        let nn = (q * (7n * k) + 2n + r * l) / (t * l);
-                        q *= k;
-                        t *= l;
-                        l += 2n;
-                        k += 1n;
-                        n = nn;
-                        r = nr;
-                    }
-                    iterations++;
-                }
-
-                // 发送数据回主线程
-                if (batchDigits.length > 0) {
-                    self.postMessage({ type: 'data', digits: batchDigits });
-                }
-                
-                // 如果需要非常高的响应速度，可以加一点微小的延迟，
-                // 但在 Worker 里通常不需要，直接循环即可
-                // 为了能接收 'stop' 消息，我们需要跳出当前的同步执行栈
-                // 但由于这是 while(isRunning)，我们需要一种机制来检查消息
-                // 在 JS 单线程模型中，最好的方式是不使用 while(true)，而是使用 setTimeout 模拟
-                // 或者，在 while 循环中我们无法响应 message。
-                // 修正：使用递归 + setTimeout 是最安全的 Worker 模式
-                
-                if (isRunning) {
-                    setTimeout(calculate, 0);
-                    return; // 结束当前函数执行，等待下一次 event loop
-                }
-            }
-        }
     </script>
 
     <script>
-        const contentDiv = document.getElementById('pi-container');
-        const countSpan = document.getElementById('count');
-        const timerSpan = document.getElementById('timer');
-        const speedSpan = document.getElementById('speed');
-        const btnStart = document.getElementById('btnStart');
-        const btnStop = document.getElementById('btnStop');
+        const workerBlob = new Blob([document.getElementById('worker-code').textContent], { type: 'text/javascript' });
+        const workerUrl = URL.createObjectURL(workerBlob);
+        let worker = null;
 
-        let worker;
-        let totalDigits = 0;
-        let startTime = 0;
-        let timerInterval;
+        const btnCalc = document.getElementById('btnCalc');
+        const statusText = document.getElementById('status-text');
+        const resultArea = document.getElementById('result-area');
+        const timeVal = document.getElementById('timeVal');
+        const lenVal = document.getElementById('lenVal');
 
-        // 创建 Worker 的黑魔法 (为了保持单文件)
-        function initWorker() {
-            const workerContent = document.getElementById('worker-code').textContent;
-            const blob = new Blob([workerContent], { type: 'application/javascript' });
-            const workerUrl = URL.createObjectURL(blob);
+        function startCalc() {
+            const digits = parseInt(document.getElementById('targetDigits').value);
+            
+            if (digits > 5000000) {
+                if (!confirm("计算超过 500 万位可能会导致浏览器内存不足崩溃。确定继续吗？")) return;
+            }
+
+            if (worker) worker.terminate();
             worker = new Worker(workerUrl);
 
+            // UI Reset
+            btnCalc.disabled = true;
+            resultArea.innerText = "正在初始化计算引擎...";
+            statusText.innerText = "准备中...";
+            resultArea.style.opacity = 0.5;
+
+            worker.postMessage(digits);
+
             worker.onmessage = function(e) {
-                if (e.data.type === 'data') {
-                    const digits = e.data.digits;
+                const data = e.data;
+                
+                if (data.type === 'status') {
+                    statusText.innerText = data.msg;
+                } 
+                else if (data.type === 'result') {
+                    statusText.innerText = "计算完成";
+                    timeVal.innerText = (data.time / 1000).toFixed(3) + " s";
                     
-                    // 优化 DOM 操作：使用 createTextNode 比 innerHTML 快
-                    // 每 1000 个字符加一个换行符方便查看（可选，这里直接追加）
-                    contentDiv.insertAdjacentText('beforeend', digits);
+                    // 渲染结果
+                    resultArea.style.opacity = 1;
+                    resultArea.innerText = data.pi;
+                    lenVal.innerText = (data.pi.length - 1).toLocaleString(); // 减去小数点的长度
                     
-                    totalDigits += digits.length;
-                    countSpan.innerText = totalDigits.toLocaleString();
-                    
-                    // 自动滚动（如果太快可以去掉这行以节省性能）
-                    // contentDiv.scrollTop = contentDiv.scrollHeight;
+                    btnCalc.disabled = false;
+                }
+                else if (data.type === 'error') {
+                    statusText.innerText = "错误: " + data.msg;
+                    btnCalc.disabled = false;
                 }
             };
-        }
-
-        initWorker();
-
-        function startWorker() {
-            if (!startTime) startTime = Date.now();
             
-            worker.postMessage('start');
-            
-            btnStart.disabled = true;
-            btnStop.disabled = false;
-
-            // 更新计时器和速度
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                const elapsed = (Date.now() - startTime) / 1000;
-                timerSpan.innerText = elapsed.toFixed(1);
-                if (elapsed > 0) {
-                    speedSpan.innerText = Math.floor(totalDigits / elapsed).toLocaleString();
-                }
-            }, 500);
-        }
-
-        function stopWorker() {
-            worker.postMessage('stop');
-            btnStart.disabled = false;
-            btnStop.disabled = true;
-            clearInterval(timerInterval);
-        }
-
-        function copyToClipboard() {
-            const text = contentDiv.innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('已复制 ' + totalDigits + ' 位数字到剪贴板');
-            });
+            worker.onerror = function(e) {
+                statusText.innerText = "Worker Error: " + e.message;
+                btnCalc.disabled = false;
+            }
         }
     </script>
 </body>
