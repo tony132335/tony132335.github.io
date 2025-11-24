@@ -1,232 +1,302 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pi 极速计算器 (修复版)</title>
-    <style>
-        body {
-            font-family: 'Courier New', Courier, monospace;
-            background-color: #0d0d0d;
-            color: #00ff41;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        h1 { margin: 10px 0; text-shadow: 0 0 10px rgba(0, 255, 65, 0.4); }
-        .tag { font-size: 0.8em; background: #222; padding: 2px 8px; border-radius: 4px; color: #fff; margin-bottom: 20px; }
-        .controls {
-            background: #1a1a1a;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            display: flex;
-            gap: 15px;
-            border: 1px solid #333;
-            align-items: center;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-        }
-        input[type="number"] {
-            background: #000;
-            border: 1px solid #444;
-            color: #fff;
-            padding: 10px;
-            width: 120px;
-            font-size: 16px;
-            border-radius: 4px;
-        }
-        button { padding: 10px 24px; font-size: 16px; cursor: pointer; background-color: #007acc; color: white; border: none; border-radius: 4px; font-weight: bold; }
-        button:hover { background-color: #006bb3; }
-        button:disabled { opacity: 0.5; cursor: wait; background-color: #444; }
-
-        .stats-panel {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            width: 100%;
-            max-width: 600px;
-            margin-bottom: 10px;
-        }
-        .stat-card { background: #111; padding: 10px; border-left: 3px solid #007acc; }
-        .stat-label { color: #888; font-size: 0.9em; display: block; }
-        .stat-value { color: #fff; font-size: 1.2em; font-weight: bold; }
-
-        #status-text { height: 20px; color: #ff9800; font-weight: bold; margin-bottom: 5px; }
-        #result-area {
-            flex: 1; width: 100%; max-width: 1200px;
-            background-color: #000; border: 1px solid #333; padding: 15px;
-            border-radius: 4px; overflow-y: auto; word-wrap: break-word;
-            font-size: 14px; line-height: 1.4; color: #ccc;
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pi 极速（可尝试大位数）</title>
+<style>
+  :root{--bg:#0d0d0d;--txt:#00ff41;--panel:#1a1a1a}
+  body{font-family:Courier,monospace;background:var(--bg);color:var(--txt);margin:0;padding:20px;display:flex;flex-direction:column;gap:12px;min-height:100vh}
+  h1{margin:0 0 6px 0;text-shadow:0 0 12px rgba(0,255,65,.3)}
+  .tag{font-size:.85rem;background:#222;padding:3px 8px;border-radius:6px;color:#fff;display:inline-block}
+  .controls{background:var(--panel);padding:12px;border-radius:8px;border:1px solid #333;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  input[type="number"]{background:#000;border:1px solid #444;color:#fff;padding:8px;border-radius:4px;width:140px}
+  button{padding:8px 14px;border-radius:6px;border:none;background:#007acc;color:#fff;cursor:pointer;font-weight:700}
+  button:disabled{opacity:.5;cursor:wait;background:#444}
+  #status{color:#ffb74d;font-weight:700;height:20px}
+  .stats{display:flex;gap:12px;flex-wrap:wrap}
+  .card{background:#111;padding:10px;border-left:4px solid #007acc;border-radius:6px}
+  #result{flex:1;background:#000;border:1px solid #333;padding:12px;border-radius:6px;color:#ccc;overflow:auto;white-space:pre-wrap;font-size:13px;line-height:1.4;max-height:45vh}
+  .note{color:#aaa;font-size:.9rem}
+  a.download{color:#00bcd4}
+</style>
 </head>
 <body>
+  <h1>π 极速（尝试大位数）</h1>
+  <span class="tag">Chudnovsky · Binary-splitting · Worker</span>
 
-<h1>&pi; Pi 极速版 (v2 修复)</h1>
-<span class="tag">Chudnovsky + Safe BigInt</span>
+  <div class="controls">
+    <label>位数（小数位）: <input id="digits" type="number" value="20000" step="1000" min="10" max="1000000"></label>
+    <button id="startBtn">立即计算</button>
+    <button id="cancelBtn" disabled>取消</button>
+    <button id="downloadBtn" disabled>导出结果</button>
+    <span class="note" id="warn"></span>
+  </div>
 
-<div class="controls">
-    <label>目标位数: <input type="number" id="targetDigits" value="20000" step="1000"></label>
-    <button id="btnCalc" onclick="startCalc()">立即计算</button>
-</div>
+  <div id="status">准备就绪</div>
 
-<div id="status-text"></div>
+  <div class="stats">
+    <div class="card"><div class="label">耗时</div><div id="timeVal">0.00 s</div></div>
+    <div class="card"><div class="label">输出长度</div><div id="lenVal">0</div></div>
+    <div class="card"><div class="label">最大建议</div><div id="suggest">推荐 ≤ 200k（浏览器友好）</div></div>
+  </div>
 
-<div class="stats-panel">
-    <div class="stat-card">
-        <span class="stat-label">总耗时</span>
-        <span class="stat-value" id="timeVal">0.00 s</span>
-    </div>
-    <div class="stat-card">
-        <span class="stat-label">实际结果长度</span>
-        <span class="stat-value" id="lenVal">0</span>
-    </div>
-</div>
+  <div id="result">准备就绪...</div>
 
-<div id="result-area">准备就绪...</div>
+  <!-- Worker 脚本文本（不会直接执行） -->
+  <script id="worker-src" type="text/plain">
+/*
+  Worker: 负责下面任务（接收数字 digits）
+  主要改动：
+  - 叶节点先生成数组，再迭代两两合并 (避免递归)
+  - pow10 用字符串拼接
+  - 提供阶段性 postMessage('progress', pct, msg)
+  - 结果以字符串返回
+*/
+self.onmessage = function(e){
+  const digits = BigInt(e.data.digits);
+  const maxTry = Number(e.data.maxTry ?? 1000000);
+  const startTime = performance.now();
 
-<!-- Worker 代码作为纯文本存放 -->
-<script id="worker-code" type="text/plain">
-self.onmessage = function(e) {
-    const digits = BigInt(e.data);
+  try{
+    // basic limits and params
+    const C = 640320n;
+    const C3_OVER_24 = C*C*C / 24n;
+    const extra = 20n;
+    const total = digits + extra;
 
-    try {
-        const start = performance.now();
-        const C = 640320n;
-        const C3_OVER_24 = C*C*C / 24n;
-
-        const iterations = Number(digits) / 14.18111561;
-        const limit = BigInt(Math.floor(iterations)) + 1n;
-
-        self.postMessage({type:"status", msg:`二分展开 (项数 ${limit})`});
-
-        function BS(a, b){
-            if(b - a === 1n){
-                const k = a;
-                if(k === 0n){
-                    return {P:1n, Q:1n, T:13591409n};
-                }
-                const P = -(6n*k - 5n)*(2n*k - 1n)*(6n*k - 1n);
-                const Q = k*k*k * C3_OVER_24;
-                const T = P * (545140134n*k + 13591409n);
-                return {P,Q,T};
-            }
-            const m = (a+b)/2n;
-            const L = BS(a,m);
-            const R = BS(m,b);
-            return {
-                P: L.P*R.P,
-                Q: L.Q*R.Q,
-                T: L.T*R.Q + L.P*R.T
-            };
-        }
-
-        const S = BS(0n, limit);
-
-        self.postMessage({type:"status", msg:"准备 sqrt..."});
-
-        const extra = 20n;
-        const total = digits + extra;
-
-        // 安全构造 10^n
-        function pow10(n){
-            return BigInt("1" + "0".repeat(Number(n)));
-        }
-
-        const M = pow10(total);
-        const sqrtBase = 10005n * (M*M);
-
-        // sqrt 初值
-        let guess = 100n * M;
-
-        function sqrtBig(n, x){
-            let x0 = x;
-            let x1 = (x0 + n/x0) >> 1n;
-            while(x1 < x0){
-                x0 = x1;
-                x1 = (x0 + n/x0) >> 1n;
-            }
-            return x0;
-        }
-
-        const s = sqrtBig(sqrtBase, guess);
-
-        self.postMessage({type:"status", msg:"最终计算 π ..."});
-
-        const pi = (426880n * S.Q * s) / S.T;
-
-        let str = pi.toString();
-        str = str.slice(0, Number(digits)+1);
-        if(str.length>1) str = str[0]+"."+str.slice(1);
-
-        const end = performance.now();
-
-        self.postMessage({
-            type:"result",
-            pi:str,
-            time:end-start
-        });
-
-    } catch(err){
-        self.postMessage({type:"error", msg:err.message});
+    function postStatus(msg, pct){
+      self.postMessage({type:'status', msg:msg, progress:pct ?? null});
     }
+
+    // iterations needed (Chudnovsky: ~14.1816 digits per term)
+    const iterations = Math.max(1, Math.ceil(Number(digits) / 14.18111561));
+    const nIter = BigInt(iterations);
+
+    postStatus(`准备生成 ${iterations} 个叶节点...`, 1);
+
+    // pow10 via string
+    function pow10Big(n){
+      if(n < 0n) return 1n;
+      // guard: convert to Number only when safe for repeat argument
+      const nn = Number(n);
+      return BigInt("1" + "0".repeat(nn));
+    }
+
+    // create leaf nodes [ {P,Q,T} ]
+    const leaves = [];
+    for(let k = 0n; k < nIter; k++){
+      if(k === 0n){
+        leaves.push({P:1n, Q:1n, T:13591409n});
+      } else {
+        const P = (6n*k - 5n)*(2n*k - 1n)*(6n*k - 1n);
+        const Q = k*k*k * C3_OVER_24;
+        const T = P * (545140134n*k + 13591409n);
+        leaves.push({P, Q, T});
+      }
+      if(Number(k) % 1000 === 0) postStatus(`生成叶节点 ${Number(k)+1}/${iterations} ...`, Math.floor(Number(k)/iterations*50));
+    }
+
+    postStatus('开始两两合并（二分合并）...', 50);
+
+    // merge function
+    function merge(a,b){
+      return {
+        P: a.P * b.P,
+        Q: a.Q * b.Q,
+        T: a.T * b.Q + a.P * b.T
+      };
+    }
+
+    // iterative pairwise merge until one remains
+    let round = 0;
+    while(leaves.length > 1){
+      const next = [];
+      for(let i=0;i<leaves.length;i+=2){
+        if(i+1 < leaves.length){
+          next.push(merge(leaves[i], leaves[i+1]));
+        } else {
+          next.push(leaves[i]);
+        }
+      }
+      leaves.length = 0; // free
+      Array.prototype.push.apply(leaves, next);
+      round++;
+      if(round % 1 === 0){
+        const pct = 50 + Math.floor((1 - 1/Math.pow(2, round)) * 40);
+        postStatus(`合并轮次 ${round}, 剩余项 ${leaves.length}`, pct);
+      }
+    }
+
+    const BS = leaves[0];
+
+    postStatus('准备计算 sqrt(10005) * 10^total 的整数表示...', 92);
+
+    // compute sqrt(10005 * 10^(2*total)) == floor( sqrt(10005) * 10^total )
+    // construct big integer: "10005" + (2*total) zeros
+    const zeros = "0".repeat(Number(2n * total)); // may throw if too large
+    const bigStr = "10005" + zeros;
+    const bigN = BigInt(bigStr);
+
+    // initial guess: 10^total * 100  (a safe overestimate)
+    const guess = BigInt("1" + "0".repeat(Number(total))) * 100n;
+
+    function bigintSqrt(n, x0){
+      if(n < 2n) return n;
+      let x = x0;
+      let y = (x + n / x) >> 1n;
+      while(y < x){
+        x = y;
+        y = (x + n / x) >> 1n;
+      }
+      return x;
+    }
+
+    const sqrtVal = bigintSqrt(bigN, guess);
+
+    postStatus('执行最终乘除，生成 π...', 96);
+
+    const numerator = 426880n * BS.Q * sqrtVal;
+    const piInt = numerator / BS.T; // integer approx of pi * 10^(digits+extra?) depends on scaling
+
+    // format: convert to string, trim to requested digits
+    let piStr = piInt.toString();
+    // The piInt currently equals floor(pi * 10^digits) if scaling matches.
+    // We used sqrt(10005*10^(2*total)) so piInt has extra digits = extra
+    // Trim trailing extra digits:
+    if(piStr.length > Number(digits) + Number(extra)){
+      piStr = piStr.slice(0, piStr.length - Number(extra));
+    }
+    // ensure length at least digits+1
+    if(piStr.length < Number(digits) + 1){
+      // pad with zeros (rare)
+      piStr = piStr + "0".repeat(Number(digits) + 1 - piStr.length);
+    }
+
+    // make "3.xxxxxx"
+    piStr = piStr.slice(0,1) + "." + piStr.slice(1);
+
+    const endTime = performance.now();
+    postStatus('完成', 100);
+    self.postMessage({type:'result', pi:piStr, time:(endTime - startTime)});
+  }catch(err){
+    self.postMessage({type:'error', msg:err && err.message ? err.message : String(err)});
+  }
 };
-</script>
+  </script>
 
 <script>
-const blob = new Blob([document.getElementById("worker-code").textContent], {
-    type: "text/javascript"
-});
-const workerURL = URL.createObjectURL(blob);
+  // UI glue
+  const startBtn = document.getElementById('startBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const digitsInput = document.getElementById('digits');
+  const status = document.getElementById('status');
+  const result = document.getElementById('result');
+  const timeVal = document.getElementById('timeVal');
+  const lenVal = document.getElementById('lenVal');
+  const warn = document.getElementById('warn');
+  const suggest = document.getElementById('suggest');
 
-let worker = null;
+  // default suggestions
+  const SAFE_RECOMMEND = 200000; // 推荐上限（大多数浏览器）
+  suggest.innerText = `推荐 ≤ ${SAFE_RECOMMEND.toLocaleString()}（浏览器友好）`;
 
-const btnCalc = document.getElementById("btnCalc");
-const statusText = document.getElementById("status-text");
-const resultArea = document.getElementById("result-area");
-const timeVal = document.getElementById("timeVal");
-const lenVal = document.getElementById("lenVal");
+  let worker = null;
+  let lastPiStr = null;
 
-function startCalc(){
-    const digits = parseInt(document.getElementById("targetDigits").value);
+  function makeWorker(){
+    const src = document.getElementById('worker-src').textContent;
+    const blob = new Blob([src], {type:'text/javascript'});
+    const url = URL.createObjectURL(blob);
+    return new Worker(url);
+  }
 
-    if(worker) worker.terminate();
-    worker = new Worker(workerURL);
+  startBtn.addEventListener('click', ()=>{
+    const digits = Number(digitsInput.value);
+    if(!Number.isFinite(digits) || digits < 1){
+      alert('请输入有效位数（正整数）');
+      return;
+    }
 
-    btnCalc.disabled = true;
-    statusText.innerText = "启动 Worker...";
-    resultArea.innerText = "计算中...";
-    resultArea.style.opacity = 0.5;
+    // warnings
+    if(digits > SAFE_RECOMMEND){
+      warn.innerText = `注意：你选择 ${digits.toLocaleString()} 位，浏览器可能会耗尽内存或长时间无响应。建议先尝试 ≤ ${SAFE_RECOMMEND.toLocaleString()}。`;
+    } else {
+      warn.innerText = '';
+    }
 
-    worker.postMessage(digits);
+    startBtn.disabled = true;
+    cancelBtn.disabled = false;
+    downloadBtn.disabled = true;
+    result.innerText = 'Worker 初始化...';
+    status.innerText = '启动 Worker';
+
+    worker = makeWorker();
 
     worker.onmessage = function(e){
-        const d = e.data;
-
-        if(d.type === "status"){
-            statusText.innerText = d.msg;
-        } else if(d.type === "result"){
-            statusText.innerText = "完成";
-            timeVal.innerText = (d.time/1000).toFixed(3)+" s";
-            resultArea.style.opacity = 1;
-            resultArea.innerText = d.pi;
-            lenVal.innerText = (d.pi.length - 2);
-            btnCalc.disabled = false;
-        } else if(d.type === "error"){
-            statusText.innerText = "错误: "+d.msg;
-            btnCalc.disabled = false;
-        }
+      const d = e.data;
+      if(d.type === 'status'){
+        status.innerText = d.msg + (d.progress ? ` (${d.progress}%)` : '');
+      } else if(d.type === 'result'){
+        const ms = d.time;
+        timeVal.innerText = (ms/1000).toFixed(3) + ' s';
+        lastPiStr = d.pi;
+        result.innerText = d.pi;
+        lenVal.innerText = (d.pi.length - 2).toLocaleString();
+        status.innerText = '完成';
+        startBtn.disabled = false;
+        cancelBtn.disabled = true;
+        downloadBtn.disabled = false;
+        worker.terminate();
+        worker = null;
+      } else if(d.type === 'error'){
+        status.innerText = '错误: ' + d.msg;
+        result.innerText = '错误：' + d.msg;
+        startBtn.disabled = false;
+        cancelBtn.disabled = true;
+        downloadBtn.disabled = true;
+        if(worker){ worker.terminate(); worker = null; }
+      }
     };
 
-    worker.onerror = e=>{
-        statusText.innerText = "Worker Err: "+e.message;
-        btnCalc.disabled = false;
+    worker.onerror = function(e){
+      status.innerText = 'Worker 异常: ' + e.message;
+      result.innerText = 'Worker 异常: ' + e.message;
+      startBtn.disabled = false;
+      cancelBtn.disabled = true;
+      downloadBtn.disabled = true;
+      if(worker){ worker.terminate(); worker = null; }
     };
-}
+
+    // send digits and maxTry hint
+    worker.postMessage({digits: digits, maxTry: 1000000});
+  });
+
+  cancelBtn.addEventListener('click', ()=>{
+    if(worker){
+      worker.terminate();
+      worker = null;
+      status.innerText = '已取消';
+      result.innerText = '已取消';
+      startBtn.disabled = false;
+      cancelBtn.disabled = true;
+      downloadBtn.disabled = !!lastPiStr ? false : true;
+    }
+  });
+
+  downloadBtn.addEventListener('click', ()=>{
+    if(!lastPiStr) return;
+    const blob = new Blob([lastPiStr], {type:'text/plain;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pi_${digitsInput.value}_digits.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
 </script>
 </body>
 </html>
