@@ -3,248 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>流式 Pi 生成器 (内存安全版)</title>
+    <title>实时 Pi 计算器 (Spigot算法)</title>
     <style>
         body {
-            font-family: 'Consolas', 'Monaco', monospace;
-            background-color: #0d1117;
-            color: #c9d1d9;
+            font-family: 'Courier New', Courier, monospace; /* 使用等宽字体 */
+            background-color: #1e1e1e;
+            color: #00ff41; /* 黑客帝国绿 */
+            margin: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
+            min-height: 100vh;
         }
 
-        h1 { color: #58a6ff; margin-bottom: 10px; }
+        h1 {
+            margin-bottom: 10px;
+            text-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
+        }
 
         .controls {
-            background-color: #161b22;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #30363d;
             margin-bottom: 20px;
-            display: flex;
-            gap: 10px;
-            align-items: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
-        }
-
-        input {
-            background: #0d1117;
-            border: 1px solid #30363d;
-            color: white;
-            padding: 8px;
-            border-radius: 4px;
-            width: 100px;
-            text-align: center;
+            background: #333;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
 
         button {
             padding: 8px 16px;
-            border-radius: 4px;
-            border: none;
+            font-size: 16px;
             cursor: pointer;
-            font-weight: bold;
-            transition: 0.2s;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            margin: 0 5px;
+            transition: background 0.2s;
         }
 
-        #startBtn { background-color: #238636; color: white; }
-        #startBtn:hover { background-color: #2ea043; }
-        
-        #stopBtn { background-color: #da3633; color: white; display: none; }
-        #stopBtn:hover { background-color: #f85149; }
+        button:hover {
+            background-color: #005f9e;
+        }
 
-        #output {
-            width: 100%;
-            max-width: 800px;
-            flex-grow: 1;
-            background-color: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 8px;
-            padding: 15px;
-            overflow-y: auto;
-            word-wrap: break-word;
-            font-size: 14px;
+        button.stop {
+            background-color: #d32f2f;
+        }
+
+        button.stop:hover {
+            background-color: #a52222;
+        }
+
+        .status {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        #pi-content {
+            width: 90%;
+            max-width: 1000px;
+            background-color: #000;
+            border: 1px solid #333;
+            padding: 20px;
+            border-radius: 4px;
+            word-wrap: break-word; /* 关键：让数字自动换行 */
+            font-size: 18px;
             line-height: 1.5;
-            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8);
+            min-height: 200px;
         }
 
-        .digit { color: #7ee787; }
-        .chunk-marker { color: #8b949e; font-size: 0.8em; margin-left: 5px; user-select: none;}
+        .digit {
+            display: inline;
+        }
         
-        /* 滚动条样式 */
-        ::-webkit-scrollbar { width: 10px; }
-        ::-webkit-scrollbar-track { background: #0d1117; }
-        ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 5px; }
-        ::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+        /* 为了突出显示刚刚计算出来的数字 */
+        @keyframes flash {
+            0% { color: white; background: #00ff41; }
+            100% { color: #00ff41; background: transparent; }
+        }
+        
+        .new-digit {
+            animation: flash 0.5s ease-out;
+        }
     </style>
 </head>
 <body>
 
-    <h1>Pi 流式挖掘机</h1>
+    <h1>&pi; Pi 实时计算器</h1>
     
     <div class="controls">
-        <label>目标位数：</label>
-        <input type="number" id="limitInput" value="2000" step="100">
-        <button id="startBtn" onclick="startSpigot()">开始挖掘</button>
-        <button id="stopBtn" onclick="stopSpigot()">停止</button>
-        <span id="status" style="font-size: 12px; color: #8b949e; margin-left: 10px;">准备就绪</span>
+        <button id="btnStart" onclick="startCalculation()">开始计算</button>
+        <button id="btnStop" class="stop" onclick="stopCalculation()">暂停</button>
+        <button onclick="resetCalculation()">重置</button>
     </div>
 
-    <div id="output"></div>
+    <div class="status">
+        当前已计算位数: <strong id="count">0</strong>
+    </div>
+
+    <div id="pi-content">3.</div>
 
     <script>
+        // 获取DOM元素
+        const contentDiv = document.getElementById('pi-content');
+        const countSpan = document.getElementById('count');
+        const btnStart = document.getElementById('btnStart');
+        const btnStop = document.getElementById('btnStop');
+
+        // 状态变量
         let isRunning = false;
-        let outputDiv = document.getElementById('output');
+        let totalDigits = 0;
         
-        // 算法需要的变量
-        let q, r, t, k, n, l;
-        let digitsFound = 0;
-        let targetDigits = 0;
-        let startTime;
+        // 算法核心变量 (BigInt)
+        // 使用 Jeremy Gibbons 的无界 Spigot 算法 (流式算法)
+        let q = 1n;
+        let r = 0n;
+        let t = 1n;
+        let k = 1n;
+        let n = 3n;
+        let l = 3n;
 
-        function startSpigot() {
+        function startCalculation() {
             if (isRunning) return;
-
-            targetDigits = parseInt(document.getElementById('limitInput').value);
-            if (!targetDigits || targetDigits < 1) return;
-
-            // 重置界面
-            outputDiv.innerHTML = "";
-            document.getElementById('startBtn').style.display = 'none';
-            document.getElementById('stopBtn').style.display = 'inline-block';
-            document.getElementById('status').innerText = "计算中...";
-            
             isRunning = true;
-            startTime = performance.now();
-
-            // 初始化算法状态
-            // Spigot 算法每输出 1 位 Pi，大约需要数组长度为 10/3 * N
-            // 为了防止阻塞，我们使用 setTimeout 分批执行
             
-            // 初始化数组，为了计算 N 位，我们需要约 3.322 * N 的数组长度
-            let len = Math.floor(10 * targetDigits / 3) + 10; 
-            let arr = new Uint32Array(len).fill(2); // 使用 TypedArray 节省内存
-            
-            let batchSize = 10; // 每次渲染前计算多少位 (根据性能动态调整)
-            let currentDigitCount = 0;
-            let heldDigits = 0; // 暂存区，处理进位（比如遇到 999）
+            btnStart.disabled = true;
+            btnStart.style.opacity = 0.5;
+            btnStop.disabled = false;
+            btnStop.style.opacity = 1;
 
-            // 核心迭代器
-            function runBatch() {
-                if (!isRunning) return;
-
-                let loopStart = performance.now();
-                
-                // 在这一帧里尽可能多算一些，但不要卡死界面（限制 15ms）
-                while (performance.now() - loopStart < 15 && currentDigitCount < targetDigits) {
-                    
-                    // Spigot 算法逻辑 (Rabinowitz and Wagon)
-                    // 这是一个逐位输出的算法
-                    // 注意：这里为了简化为“流式”展示，我们使用简化的逻辑
-                    // 实际的逐位算法比较复杂，这里用的是一个标准的 spigot 实现变体
-                    
-                    // --- 这里的逻辑稍微复杂，因为标准的 Spigot 实际上是每次打印一位 ---
-                    // 下面是核心循环：
-                    
-                    let q = 0;
-                    for (let i = len - 1; i >= 0; i--) {
-                        let x = 10 * arr[i] + q * i;
-                        arr[i] = x % (2 * i - 1);
-                        q = Math.floor(x / (2 * i - 1));
-                    }
-                    
-                    arr[0] = q % 10;
-                    q = Math.floor(q / 10);
-
-                    // 处理特殊的 "9" 进位情况
-                    if (q == 9) {
-                        heldDigits++;
-                    } else if (q == 10) {
-                        // 进位发生了！
-                        appendDigit(preDigit + 1);
-                        for (let k = 0; k < heldDigits; k++) {
-                            appendDigit(0);
-                        }
-                        preDigit = 0;
-                        heldDigits = 0;
-                    } else {
-                        // 输出暂存的数字
-                        if (currentDigitCount > 0) { // 跳过最开始的空
-                             appendDigit(preDigit);
-                        }
-                        
-                        for (let k = 0; k < heldDigits; k++) {
-                            appendDigit(9);
-                        }
-                        heldDigits = 0;
-                        preDigit = q;
-                    }
-                    
-                    currentDigitCount++;
-                }
-
-                if (currentDigitCount < targetDigits) {
-                    // 滚动到底部
-                    outputDiv.scrollTop = outputDiv.scrollHeight;
-                    // 告诉浏览器：休息一下，马上回来继续算
-                    requestAnimationFrame(runBatch);
-                } else {
-                    // 收尾
-                    appendDigit(preDigit);
-                    for (let k = 0; k < heldDigits; k++) appendDigit(9);
-                    finish();
-                }
-            }
-
-            // 初始化第一个“前置位”
-            let preDigit = 0; 
-            
-            // 第一次运行
-            // 稍微延迟一下让 UI 反应
-            setTimeout(runBatch, 10);
+            // 启动循环
+            calculateStep();
         }
 
-        function appendDigit(d) {
-            // 只有当 digitsFound 对应真实输出时才增加
-            if (digitsFound >= targetDigits) return;
-
-            let span = document.createElement('span');
-            span.className = 'digit';
-            span.innerText = d;
-            outputDiv.appendChild(span);
-
-            digitsFound++;
-
-            // 加上小数点
-            if (digitsFound === 1) {
-                outputDiv.appendChild(document.createTextNode("."));
-            }
-            
-            // 每 50 位加个换行，方便看
-            if ((digitsFound - 1) % 100 === 0 && digitsFound > 1) {
-                 let mark = document.createElement('span');
-                 mark.className = 'chunk-marker';
-                 mark.innerText = `[${digitsFound-1}]`;
-                 outputDiv.appendChild(mark);
-                 outputDiv.appendChild(document.createElement('br'));
-            }
-        }
-
-        function stopSpigot() {
+        function stopCalculation() {
             isRunning = false;
-            finish();
+            btnStart.disabled = false;
+            btnStart.style.opacity = 1;
+            btnStop.disabled = true;
+            btnStop.style.opacity = 0.5;
         }
 
-        function finish() {
-            document.getElementById('startBtn').style.display = 'inline-block';
-            document.getElementById('stopBtn').style.display = 'none';
-            let time = ((performance.now() - startTime) / 1000).toFixed(2);
-            document.getElementById('status').innerText = `完成！耗时 ${time} 秒`;
+        function resetCalculation() {
+            stopCalculation();
+            // 重置算法变量
+            q = 1n; r = 0n; t = 1n; k = 1n; n = 3n; l = 3n;
+            totalDigits = 0;
+            // 重置UI
+            contentDiv.innerHTML = "3.";
+            countSpan.innerText = "0";
         }
+
+        function calculateStep() {
+            if (!isRunning) return;
+
+            // 每次执行计算一批数字，而不是一个，以平衡 UI 刷新率和计算速度
+            // BigInt 运算随位数增加会变慢，所以我们可以动态调整这个 batchSize，或者固定它
+            const batchSize = 50; 
+            let batchOutput = "";
+
+            for (let i = 0; i < batchSize; i++) {
+                // 算法核心逻辑：
+                // 检查是否产生了一个确定的数字
+                if (4n * q + r - t < n * t) {
+                    // 输出数字 n
+                    batchOutput += n.toString();
+                    totalDigits++;
+
+                    // 更新状态以计算下一位 (相当于乘以10)
+                    let nr = 10n * (r - n * t);
+                    n = ((10n * (3n * q + r)) / t) - 10n * n;
+                    q *= 10n;
+                    r = nr;
+                } else {
+                    // 还没有产生数字，继续迭代级数
+                    let nr = (2n * q + r) * l;
+                    let nn = (q * (7n * k) + 2n + r * l) / (t * l);
+                    q *= k;
+                    t *= l;
+                    l += 2n;
+                    k += 1n;
+                    n = nn;
+                    r = nr;
+                }
+            }
+
+            // 更新 DOM
+            if (batchOutput.length > 0) {
+                // 我们创建一个 span 只是为了给新数字加一点特效，或者直接追加文本
+                // 为了性能，当数字非常多时，直接追加文本节点是最好的
+                contentDiv.insertAdjacentText('beforeend', batchOutput);
+                countSpan.innerText = totalDigits;
+                
+                // 自动滚动到底部
+                // window.scrollTo(0, document.body.scrollHeight);
+            }
+
+            // 使用 setTimeout(..., 0) 让出主线程，允许浏览器渲染UI，然后再继续计算
+            setTimeout(calculateStep, 0);
+        }
+
+        // 初始化按钮状态
+        btnStop.disabled = true;
+        btnStop.style.opacity = 0.5;
 
     </script>
 </body>
