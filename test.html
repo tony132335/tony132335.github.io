@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>智慧即時課程表 AI — 玻璃 + Dynamic Island</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700&family=Roboto+Mono:wght@500&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+
+    <style>
+        :root{
+            /* 更透明、更冷的玻璃基色，靠近 macOS 淡色系 */
+            --glass-foreground: rgba(255,255,255,0.06);
+            --glass-foreground-2: rgba(255,255,255,0.08);
+            --glass-border: rgba(255,255,255,0.12);
+            --glass-strong: rgba(255,255,255,0.14);
+            --glass-shadow: 0 10px 30px rgba(12,18,28,0.32);
+            --accent-blue: #3b82f6;
+            --accent-purple: #7c3aed;
+            --glass-frost: rgba(255,255,255,0.2);
+        }
+
+        html,body{height:100%}
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            /* 背景用漸層 + 微雲彩圖層模擬深色霧狀背景，讓玻璃更有層次 */
+            background-image:
+                radial-gradient(1200px 600px at 10% 10%, rgba(124,58,237,0.06), transparent 10%),
+                radial-gradient(1000px 500px at 90% 90%, rgba(59,130,246,0.05), transparent 10%),
+                linear-gradient(135deg, #e6f7ff 0%, #fff7fb 100%);
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+            height: 100vh;
+            margin:0;
+            overflow:hidden;
+            color: #0f172a;
+        }
+
+        .clock-font { font-family: 'Roboto Mono', monospace; }
+
+        /* 玻璃基礎樣式（更「真」的玻璃效果） */
+        .glass {
+            position: relative;
+            background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+            border: 1px solid var(--glass-border);
+            -webkit-backdrop-filter: blur(14px) saturate(120%) contrast(1.02);
+            backdrop-filter: blur(14px) saturate(120%) contrast(1.02);
+            box-shadow: var(--glass-shadow);
+            border-radius: 1rem;
+            overflow: hidden;
+            color: inherit;
+        }
+
+        /* 深色玻璃卡片（dialog / modal） */
+        .glass-dark {
+            background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
+            border: 1px solid rgba(255,255,255,0.12);
+            -webkit-backdrop-filter: blur(18px) saturate(120%);
+            backdrop-filter: blur(18px) saturate(120%);
+            color: #0b1220;
+        }
+
+        /* 內陰影和 highlight gradient，讓玻璃更立體 */
+        .glass::before{
+            content:"";
+            position:absolute;
+            inset:0;
+            pointer-events:none;
+            background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0));
+            mix-blend-mode: screen;
+        }
+        .glass::after{
+            content:"";
+            position:absolute;
+            top:0; left:0; right:0; height:2px;
+            background: linear-gradient(90deg, rgba(255,255,255,0.14), rgba(255,255,255,0));
+            pointer-events:none;
+            opacity:0.6;
+        }
+
+        /* 當前卡強化（保留你的原始樣式但更融入玻璃） */
+        .active-card{
+            background: linear-gradient(90deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+            border-left: 6px solid var(--accent-blue);
+            transform: translateX(6px) scale(1.01);
+            box-shadow: 0 12px 30px rgba(59,130,246,0.12);
+            z-index: 12;
+        }
+
+        .past-card{
+            opacity:0.55;
+            filter:grayscale(0.7);
+            transform: scale(0.995);
+        }
+
+        /* 自訂滾動條（保留） */
+        .custom-scroll::-webkit-scrollbar { width:8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: rgba(11,20,40,0.12); border-radius:20px; }
+
+        /* Dynamic Island（頂部中間可互動膠囊） */
+        .dynamic-island {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 60;
+            height: 44px;
+            display: flex;
+            align-items:center;
+            padding: 6px 14px;
+            gap:12px;
+            border-radius: 999px;
+            transition: width 360ms cubic-bezier(.2,.9,.2,1), height 220ms ease, transform 200ms ease, opacity 200ms ease;
+            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: 0 8px 30px rgba(12,18,28,0.28);
+            background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.03));
+            min-width: 84px;
+            max-width: 720px;
+            overflow:hidden;
+            cursor: default;
+        }
+
+        /* Compact state = small pill */
+        .dynamic-island.compact {
+            width: 80px;
+            justify-content: center;
+            padding: 6px;
+        }
+
+        /* Expanded state showing details */
+        .dynamic-island.expanded {
+            width: min(56%, 620px);
+            padding: 10px 18px;
+        }
+
+        .dynamic-island .island-avatar {
+            flex: 0 0 36px;
+            height: 36px;
+            border-radius: 8px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:16px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .island-content {
+            display:flex;
+            flex-direction:column;
+            gap:2px;
+            min-width:0;
+        }
+
+        .island-title {
+            font-weight:700;
+            font-size:14px;
+            line-height:1;
+            color: #071133;
+            white-space:nowrap;
+            overflow:hidden;
+            text-overflow:ellipsis;
+        }
+
+        .island-sub {
+            font-size:12px;
+            color: rgba(4,10,20,0.6);
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        .island-progress {
+            height:6px;
+            border-radius:6px;
+            background: rgba(7,17,51,0.05);
+            width:100%;
+            overflow:hidden;
+            margin-top:8px;
+        }
+        .island-progress > i {
+            display:block;
+            height:100%;
+            width:0%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+            border-radius:6px;
+            transition: width 600ms linear;
+        }
+
+        /* small pulse for attention */
+        .pulse {
+            animation: pulseIsland 1.6s infinite;
+        }
+        @keyframes pulseIsland {
+            0%{ box-shadow: 0 8px 28px rgba(59,130,246,0.08); }
+            50%{ box-shadow: 0 14px 36px rgba(59,130,246,0.10); }
+            100%{ box-shadow: 0 8px 28px rgba(59,130,246,0.08); }
+        }
+
+        /* 其他微調（保持你的原先樣式） */
+        .schedule-item { transition: all 0.45s cubic-bezier(.2,.9,.2,1); }
+        .animate-pulse-soft { animation: pulse-soft 2s infinite; }
+        @keyframes pulse-soft { 0%,100%{opacity:1}50%{opacity:0.8} }
+
+        /* 小螢幕 & 相容性 */
+        @media (max-width: 640px){
+            .dynamic-island { top: 12px; height:36px; }
+            header.mini-hide { display:none; }
+        }
+
+    </style>
+</head>
+<body class="flex flex-col h-screen text-gray-800">
+
+    <!-- Dynamic Island（頂部中間）-->
+    <div id="dynamicIsland" class="dynamic-island compact" aria-hidden="false" title="當前課程">
+        <div class="island-avatar" id="islandIcon"><i class="fa-solid fa-apple-whole"></i></div>
+        <div class="island-content" id="islandContent" style="display:none;">
+            <div class="island-title" id="islandTitle">—</div>
+            <div class="island-sub" id="islandSub">—</div>
+            <div class="island-progress" style="display:block;">
+                <i id="islandProgressBar" style="width:0%"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頂部資訊欄 -->
+    <header class="glass m-4 mb-2 p-4 rounded-2xl flex justify-between items-center z-20 shrink-0">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center text-white text-xl shadow-lg glass-avatar">
+                <i class="fa-solid fa-graduation-cap"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">學校即時課表 <span class="text-xs align-top text-purple-600 bg-purple-100 px-1 rounded border border-purple-200">AI+</span></h1>
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-bold border border-blue-200" id="weekTypeDisplay">--</span>
+                    <span class="text-sm text-gray-600 font-medium" id="currentDateDisplay">--/--/--</span>
+                </div>
+            </div>
+        </div>
+        <div class="text-right flex items-center gap-4">
+            <div class="hidden md:block">
+                <div class="text-3xl font-bold clock-font text-gray-700" id="liveClock">00:00:00</div>
+            </div>
+            <button onclick="openEditor()" class="glass hover:brightness-105 transition p-3 rounded-xl text-blue-600 shadow-sm group relative" title="編輯課表">
+                <i class="fa-solid fa-pen-to-square text-lg"></i>
+            </button>
+            <button onclick="openShare()" class="glass hover:brightness-105 transition p-3 rounded-xl text-green-600 shadow-sm" title="分享/導出">
+                <i class="fa-solid fa-share-nodes text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- 主要內容區 -->
+    <main class="flex-1 flex overflow-hidden relative px-4 pb-4 gap-4">
+        <!-- 左側：當前狀態大看板 -->
+        <section class="w-full md:w-5/12 lg:w-1/3 glass rounded-2xl p-8 flex flex-col justify-center items-center relative overflow-hidden">
+            <div class="absolute -top-10 -left-10 w-40 h-40 bg-purple-300 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-pulse-soft"></div>
+            <div class="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-300 rounded-full mix-blend-multiply filter blur-2xl opacity-30 animate-pulse-soft" style="animation-delay: 1s;"></div>
+
+            <div id="statusContainer" class="text-center w-full z-10">
+                <div class="animate-pulse flex flex-col items-center">
+                    <div class="h-4 bg-gray-300 rounded w-1/2 mb-4"></div>
+                    <div class="h-12 bg-gray-300 rounded w-3/4 mb-4"></div>
+                    <div class="h-8 bg-gray-300 rounded w-1/3"></div>
+                </div>
+            </div>
+
+            <div id="aiAdviceBox" class="hidden absolute bottom-4 left-4 right-4 bg-white/10 backdrop-blur border border-purple-200 p-4 rounded-xl shadow-lg z-20 transform transition-all duration-300 translate-y-full">
+                <div class="flex items-start gap-3">
+                    <div class="text-purple-500 text-xl pt-1"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                    <div class="flex-1">
+                        <h4 class="font-bold text-sm text-purple-800 mb-1">AI 學習小幫手</h4>
+                        <p id="aiAdviceText" class="text-sm text-gray-700 leading-relaxed">正在思考中...</p>
+                    </div>
+                    <button onclick="closeAiAdvice()" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 右側：滾動式課表 -->
+        <section class="hidden md:block w-7/12 lg:w-2/3 glass rounded-2xl p-6 overflow-y-auto custom-scroll relative" id="scheduleList">
+            <div id="timelineContainer" class="max-w-4xl mx-auto space-y-4 pb-20 pt-4"></div>
+            <div id="emptyState" class="hidden h-full flex items-center justify-center text-gray-400">
+                <div class="text-center">
+                    <i class="fa-solid fa-mug-hot text-6xl mb-4 text-gray-300"></i>
+                    <p class="text-xl font-light">今天沒有安排課程</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- GUI 編輯器模態框 -->
+    <div id="editorModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-50 flex items-center justify-center transition-opacity opacity-0">
+        <div class="glass-dark w-11/12 max-w-4xl h-[85vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden transform scale-95 transition-transform duration-300">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-white/50">
+                <div class="flex items-center gap-2">
+                    <div class="bg-blue-100 p-2 rounded-lg text-blue-600"><i class="fa-solid fa-sliders"></i></div>
+                    <h2 class="text-lg font-bold">課表編輯器</h2>
+                </div>
+                <button onclick="closeEditor()" class="text-gray-400 hover:text-red-500 w-8 h-8 rounded-full hover:bg-red-50 transition"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="flex-1 flex overflow-hidden">
+                <div class="w-1/4 bg-gray-50/50 border-r border-gray-200 overflow-y-auto p-2 space-y-1" id="editorSidebar"></div>
+                <div class="w-3/4 flex flex-col bg-white/30 relative">
+                    <div id="aiLoadingOverlay" class="hidden loading-overlay flex-col">
+                        <div class="text-4xl text-purple-500 mb-4 animate-bounce"><i class="fa-solid fa-robot"></i></div>
+                        <div class="text-lg font-bold text-purple-800">AI 正在分析您的輸入...</div>
+                        <div class="text-sm text-gray-500 mt-2">這可能需要幾秒鐘</div>
+                    </div>
+
+                    <div class="p-4 border-b border-gray-200 bg-gray-50/30 flex justify-between items-center">
+                        <span class="text-sm text-gray-500 font-bold uppercase tracking-wider" id="editorCurrentDayLabel">SELECT A DAY</span>
+                        <div class="flex gap-2">
+                             <button onclick="openAiImport()" class="bg-purple-100 hover:bg-purple-200 text-purple-700 text-sm px-3 py-1.5 rounded-lg shadow-sm border border-purple-200 transition flex items-center sparkle-btn">
+                                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> AI 智能排課
+                            </button>
+                            <button onclick="addEditorRow()" class="bg-blue-500 hover:bg-blue-600 text-white text-sm px-3 py-1.5 rounded-lg shadow transition">
+                                <i class="fa-solid fa-plus mr-1"></i> 新增課堂
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto p-4 space-y-2" id="editorRowsContainer">
+                        <div class="text-center text-gray-400 mt-10">請選擇左側日期開始編輯</div>
+                    </div>
+
+                    <div id="aiImportArea" class="hidden absolute inset-0 bg-white z-10 flex flex-col p-6">
+                        <h3 class="text-lg font-bold text-purple-700 mb-2 flex items-center">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-2"></i> 告訴 AI 你的行程
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-4">
+                            直接貼上文字敘述，AI 會自動幫你轉換。例如：<br>
+                            "星期一 8:15 中文, 9:00 英文, 9:45 數學, 10:30 小息, 10:50 通識"
+                        </p>
+                        <textarea id="aiInputText" class="flex-1 border border-purple-200 rounded-lg p-4 bg-purple-50 focus:ring-2 focus:ring-purple-400 outline-none resize-none mb-4" placeholder="在這裡貼上課表文字..."></textarea>
+                        <div class="flex justify-end gap-3">
+                            <button onclick="closeAiImport()" class="text-gray-500 hover:bg-gray-100 px-4 py-2 rounded-lg">取消</button>
+                            <button onclick="runAiImport()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg flex items-center">
+                                <i class="fa-solid fa-bolt mr-2"></i> 生成課表
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-200 bg-white/80 flex justify-between items-center text-sm">
+                <div class="flex items-center gap-4">
+                    <label class="flex flex-col">
+                        <span class="text-xs text-gray-500 font-bold mb-1">Week A 基準日 (週日)</span>
+                        <input type="date" id="settingRefDate" class="border rounded px-2 py-1 bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none">
+                    </label>
+                    <div class="h-8 w-px bg-gray-300"></div>
+                    <button onclick="resetToDefault()" class="text-red-400 hover:text-red-600 underline">重置所有數據</button>
+                </div>
+                <button onclick="saveFromEditor()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-xl font-bold shadow-lg transform hover:-translate-y-1 transition flex items-center">
+                    <i class="fa-solid fa-check mr-2"></i> 儲存變更
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 分享/導出模態框 -->
+    <div id="shareModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+        <div class="glass-dark w-full max-w-md p-6 rounded-2xl shadow-2xl mx-4">
+            <h3 class="text-xl font-bold mb-4 flex items-center"><i class="fa-solid fa-cloud-arrow-up mr-2 text-blue-500"></i> 同步與導出</h3>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">分享連結 (含完整課表數據)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="shareUrlInput" readonly class="flex-1 border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 select-all">
+                        <button onclick="copyShareLink()" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition"><i class="fa-regular fa-copy"></i></button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">學生只需打開此連結，課表將自動同步。</p>
+                </div>
+
+                <div class="border-t pt-4">
+                     <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">備份文件</label>
+                     <button onclick="downloadJson()" class="w-full border border-gray-300 hover:bg-gray-50 text-gray-700 py-2 rounded-lg transition flex items-center justify-center mb-2">
+                        <i class="fa-solid fa-file-code mr-2"></i> 下載 .json 檔案
+                     </button>
+                </div>
+
+                <div class="border-t pt-4">
+                    <label class="block text-xs font-bold text-gray-500 mb-1 uppercase">導入備份 (覆蓋當前)</label>
+                    <div class="flex gap-2">
+                        <label class="flex-1 cursor-pointer border border-dashed border-gray-300 hover:bg-gray-50 hover:border-blue-400 rounded-lg p-2 text-center transition flex items-center justify-center gap-2 text-sm text-gray-600">
+                            <i class="fa-solid fa-upload"></i>
+                            <span id="importFileName">選擇 .json 檔案</span>
+                            <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="handleFileSelect(this)">
+                        </label>
+                        <button onclick="confirmImport()" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition" id="importBtn" disabled>
+                            導入
+                        </button>
+                    </div>
+                    <p class="text-xs text-red-400 mt-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 注意：導入將直接覆蓋您當前所有設定。</p>
+                </div>
+            </div>
+
+            <div class="mt-6 text-right">
+                <button onclick="document.getElementById('shareModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-800 px-4">關閉</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- (你的 Gemini 舊代碼保留) ---
+        const apiKey = ""; // API key will be injected by the environment
+
+        async function callGemini(prompt, isJson = false) {
+            if (!apiKey) {
+                console.warn("API Key not found, using mock response if possible or failing gracefully.");
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }]
+            };
+
+            if (isJson) {
+                payload.generationConfig = {
+                    responseMimeType: "application/json"
+                };
+            }
+
+            const maxRetries = 3;
+            let delay = 1000;
+
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                    const data = await response.json();
+                    return data.candidates[0].content.parts[0].text;
+                } catch (e) {
+                    console.warn(`Attempt ${i+1} failed:`, e);
+                    if (i === maxRetries - 1) throw e;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        // --- Core data unchanged (DEFAULT_CONFIG copied) ---
+        const DEFAULT_CONFIG = {
+          "settings": {
+            "referenceDate": "2024-11-24",
+            "referenceWeekType": "A"
+          },
+          "schedules": {
+            "A_1": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng(Sp)", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Eng", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Eng", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CL", "type": "lesson" }
+            ],
+            /* ... 原來的大表格保持不變 ... */
+            "A_2": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "PE", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "PE", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Geog", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Math", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Hist", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "IS", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "Eng", "type": "lesson" }
+            ],
+            "A_3": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Music", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Music", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "PTH", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Eng", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Math", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "IS", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Chi", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
+            ],
+            "A_4": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Math", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Eng", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "CHist", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "STEAM", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "STEAM", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "IS", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Chi", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "Chi", "type": "lesson" }
+            ],
+            "A_5": [
+              { "start": "08:00", "end": "08:15", "subject": "QTV / CTT", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "CHist", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "IS", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Math", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Chi", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Geog", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "PSE", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "PSE", "type": "lesson" }
+            ],
+            "B_1": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Chi", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "IS", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Eng", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Music", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Music", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "CL", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CL", "type": "lesson" }
+            ],
+            "B_2": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "PE", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "PE", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Chi", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "VA", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "VA", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Math", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "IS", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "Eng", "type": "lesson" }
+            ],
+            "B_3": [
+              { "start": "08:00", "end": "08:15", "subject": "Class Teacher Time", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Eng", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "CHist", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Math", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "IS", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Chi", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Hist", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
+            ],
+            "B_4": [
+              { "start": "08:00", "end": "08:15", "subject": "Assembly", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Eng", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Eng", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "IS", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "STEAM", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "STEAM", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Reading", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Chi", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Math", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "CES", "type": "lesson" }
+            ],
+            "B_5": [
+              { "start": "08:00", "end": "08:15", "subject": "QTV / CTT", "type": "activity" },
+              { "start": "08:15", "end": "09:00", "subject": "Math", "type": "lesson" },
+              { "start": "09:00", "end": "09:45", "subject": "Geog", "type": "lesson" },
+              { "start": "09:45", "end": "10:30", "subject": "Hist", "type": "lesson" },
+              { "start": "10:30", "end": "10:50", "subject": "Recess", "type": "break" },
+              { "start": "10:50", "end": "11:35", "subject": "Chi", "type": "lesson" },
+              { "start": "11:35", "end": "12:20", "subject": "Chi", "type": "lesson" },
+              { "start": "12:20", "end": "13:20", "subject": "Lunch", "type": "break" },
+              { "start": "13:20", "end": "13:40", "subject": "Activity", "type": "activity" },
+              { "start": "13:40", "end": "14:25", "subject": "Eng(Sp)", "type": "lesson" },
+              { "start": "14:25", "end": "15:10", "subject": "Eng", "type": "lesson" },
+              { "start": "15:10", "end": "15:55", "subject": "PSE", "type": "lesson" }
+            ]
+          },
+          "specialEvents": {}
+        };
+
+        // NOTE: 為了簡潔示範，上面只顯示 A_1 的完整資料；實際使用時已在檔案內保留完整 schedules（與你原始檔一樣）。
+
+        let appData = null;
+        let editingDayKey = null;
+        let pendingImportData = null;
+
+        window.onload = function() {
+            if(window.location.hash.startsWith("#data=")) {
+                try {
+                    const compressed = window.location.hash.substring(6);
+                    const decoded = decodeURIComponent(escape(atob(compressed)));
+                    appData = JSON.parse(decoded);
+                    localStorage.setItem('schoolTimetableConfig', JSON.stringify(appData));
+                    history.replaceState(null, null, ' ');
+                    alert("課表已從連結同步成功！");
+                } catch(e) {
+                    console.error("Sync failed", e);
+                    alert("同步連結無效或已損壞。");
+                }
+            }
+
+            if (!appData) loadData();
+
+            startClock();
+            renderApp();
+            setInterval(updateLiveStatus, 1000);
+        };
+
+        function loadData() {
+            const stored = localStorage.getItem('schoolTimetableConfig');
+            if (stored) {
+                try { appData = JSON.parse(stored); } catch (e) { appData = DEFAULT_CONFIG; }
+            } else {
+                appData = DEFAULT_CONFIG;
+            }
+        }
+
+        function getWeekType(date) {
+            const refDate = new Date(appData.settings.referenceDate);
+            const targetDate = new Date(date);
+            refDate.setHours(0,0,0,0);
+            targetDate.setHours(0,0,0,0);
+            const diffDays = Math.floor((targetDate - refDate) / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) return appData.settings.referenceWeekType;
+            const weeksPassed = Math.floor(diffDays / 7);
+            const isEvenWeek = weeksPassed % 2 === 0;
+            return appData.settings.referenceWeekType === "A"
+                ? (isEvenWeek ? "A" : "B")
+                : (isEvenWeek ? "B" : "A");
+        }
+
+        function getTodaySchedule() {
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            const dayOfWeek = now.getDay();
+            const weekType = getWeekType(now);
+
+            document.getElementById('currentDateDisplay').innerText = now.toLocaleDateString('zh-HK');
+
+            if (appData.specialEvents && appData.specialEvents[dateStr]) {
+                document.getElementById('weekTypeDisplay').innerText = "Special";
+                document.getElementById('weekTypeDisplay').className = "bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md text-xs font-bold border border-purple-200";
+                return appData.specialEvents[dateStr];
+            }
+
+            document.getElementById('weekTypeDisplay').innerText = `Week ${weekType}`;
+            document.getElementById('weekTypeDisplay').className = weekType === 'A'
+                ? "bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-bold border border-blue-200"
+                : "bg-green-100 text-green-700 px-2 py-0.5 rounded-md text-xs font-bold border border-green-200";
+
+            const key = `${weekType}_${dayOfWeek}`;
+            return appData.schedules[key] || [];
+        }
+
+        function parseTime(timeStr) {
+            const d = new Date();
+            const [h, m] = timeStr.split(':').map(Number);
+            d.setHours(h, m, 0, 0);
+            return d;
+        }
+
+        function formatCountdown(ms) {
+            if (ms < 0) return "00:00:00";
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            return `${h>0?h+':':''}${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }
+
+        // --- Render UI (基本保留你原本內容，但卡片背景改為玻璃風) ---
+        function renderApp() {
+            const listContainer = document.getElementById('timelineContainer');
+            const schedule = getTodaySchedule();
+
+            listContainer.innerHTML = '';
+
+            if (!schedule || schedule.length === 0) {
+                document.getElementById('emptyState').classList.remove('hidden');
+                document.getElementById('statusContainer').innerHTML = `<h2 class="text-2xl text-gray-500 font-light">今日無課程安排</h2>`;
+                return;
+            } else {
+                document.getElementById('emptyState').classList.add('hidden');
+            }
+
+            schedule.forEach((item, index) => {
+                const el = document.createElement('div');
+                el.className = `schedule-item group p-4 rounded-xl border border-white/10 shadow-sm flex justify-between items-center relative overflow-hidden backdrop-blur-sm hover:scale-[1.01] transition-all glass`;
+                el.id = `card-${index}`;
+
+                let icon = "fa-book";
+                let iconColor = "text-blue-400";
+                if(item.type === 'break') { icon = "fa-mug-hot"; iconColor = "text-green-400"; }
+                else if (item.type === 'activity') { icon = "fa-star"; iconColor = "text-yellow-400"; }
+
+                const showAiBtn = item.type === 'lesson';
+
+                el.innerHTML = `
+                    <div class="flex items-center gap-4 z-10 w-full">
+                        <div class="text-gray-500 font-mono text-sm w-20 text-center flex flex-col justify-center border-r border-gray-200 pr-4">
+                            <span class="font-bold text-gray-700">${item.start}</span>
+                            <span class="text-xs text-gray-400">${item.end}</span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start">
+                                <div class="text-lg font-bold text-gray-800 flex items-center">
+                                    <div class="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center mr-3 shadow-inner">
+                                        <i class="fa-solid ${icon} ${iconColor} text-sm"></i>
+                                    </div>
+                                    ${item.subject}
+                                </div>
+                                ${showAiBtn ? `
+                                <button onclick="askAiAboutSubject('${item.subject}')" class="ai-hint-btn opacity-0 group-hover:opacity-100 transition text-xs bg-purple-100 text-purple-600 px-2 py-1 rounded-full border border-purple-200 hover:bg-purple-200 flex items-center gap-1" title="Ask AI for tips">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> 學習貼士
+                                </button>
+                                ` : ''}
+                            </div>
+                            <div class="flex justify-between items-center mt-1 h-5">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-600 status-badge hidden">
+                                    進行中 <i class="fa-solid fa-spinner fa-spin ml-1"></i>
+                                </span>
+                                <div class="countdown-timer text-sm font-mono font-bold text-blue-600 ml-auto"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="progress-bg absolute bottom-0 left-0 h-1 bg-gradient-to-r from-blue-400 to-purple-400 transition-all duration-1000 opacity-0" style="width: 0%"></div>
+                `;
+                listContainer.appendChild(el);
+            });
+            updateLiveStatus();
+        }
+
+        // --- Dynamic Island 行為整合到 updateLiveStatus（保持原有 logic，但同步 island） ---
+        function updateLiveStatus() {
+            const now = new Date();
+            const schedule = getTodaySchedule();
+            const statusBox = document.getElementById('statusContainer');
+
+            if(!schedule || schedule.length === 0) return;
+
+            let currentIdx = -1;
+            let nextIdx = -1;
+
+            for (let i = 0; i < schedule.length; i++) {
+                const item = schedule[i];
+                const start = parseTime(item.start);
+                const end = parseTime(item.end);
+                const card = document.getElementById(`card-${i}`);
+
+                if(!card) continue;
+
+                card.classList.remove('active-card', 'past-card');
+                const statusBadge = card.querySelector('.status-badge');
+                if (statusBadge) statusBadge.classList.add('hidden');
+                const progressEl = card.querySelector('.progress-bg');
+                if (progressEl) { progressEl.style.opacity = '0'; progressEl.style.width = '0%'; }
+                const countdown = card.querySelector('.countdown-timer');
+                if (countdown) countdown.innerText = '';
+
+                const aiBtn = card.querySelector('.ai-hint-btn');
+                if(aiBtn) aiBtn.classList.remove('opacity-100');
+
+                if (now >= start && now < end) {
+                    currentIdx = i;
+                    card.classList.add('active-card');
+                    if (statusBadge) statusBadge.classList.remove('hidden');
+                    if (progressEl) progressEl.style.opacity = '1';
+                    if(aiBtn) aiBtn.classList.add('opacity-100');
+
+                    const percent = Math.round(((now - start) / (end - start)) * 100);
+                    if (progressEl) progressEl.style.width = `${percent}%`;
+                    if (countdown) countdown.innerText = `剩餘 ${formatCountdown(end - now)}`;
+
+                    scrollToCard(card);
+
+                    statusBox.innerHTML = `
+                        <div class="text-blue-500 font-bold tracking-widest text-xs uppercase mb-2 animate-pulse">Now Active</div>
+                        <h1 class="text-5xl font-bold text-gray-800 mb-2 drop-shadow-sm">${item.subject}</h1>
+                        <div class="text-3xl font-mono text-gray-600 bg-white/50 px-4 py-1 rounded-lg inline-block shadow-sm">
+                            ${formatCountdown(end - now)}
+                        </div>
+                        <div class="mt-6 text-gray-400 text-sm flex items-center justify-center gap-2">
+                            <span>Next:</span>
+                            <span class="font-bold text-gray-600">${schedule[i+1] ? schedule[i+1].subject : '放學'}</span>
+                        </div>
+                    `;
+
+                    // 更新 Dynamic Island：放詳細（expanded）
+                    showIslandExpanded({
+                        title: item.subject,
+                        subtitle: `${item.start} — ${item.end} • 剩餘 ${formatCountdown(end-now)}`,
+                        progress: percent,
+                        iconClass: (item.type === 'break' ? 'fa-mug-hot' : (item.type === 'activity' ? 'fa-star' : 'fa-book'))
+                    });
+
+                } else if (now >= end) {
+                    card.classList.add('past-card');
+                } else {
+                    if (nextIdx === -1) nextIdx = i;
+                }
+            }
+
+            if (currentIdx === -1) {
+                if (nextIdx !== -1) {
+                    const next = schedule[nextIdx];
+                    const diff = parseTime(next.start) - now;
+                    const nextCard = document.getElementById(`card-${nextIdx}`);
+                    if(nextCard) nextCard.querySelector('.countdown-timer').innerText = `開始於 ${formatCountdown(diff)}`;
+
+                    statusBox.innerHTML = `
+                        <div class="text-green-500 font-bold tracking-widest text-xs uppercase mb-2">Coming Up</div>
+                        <h1 class="text-4xl font-bold text-gray-700 mb-2">${next.subject}</h1>
+                        <div class="text-xl text-blue-500 font-mono mt-2">
+                             <i class="fa-regular fa-clock mr-2"></i>${formatCountdown(diff)}
+                        </div>
+                        <p class="text-gray-400 mt-2 text-sm">開始時間: ${next.start}</p>
+                    `;
+
+                    // Dynamic Island：展示 upcoming（expanded 小版）
+                    showIslandExpanded({
+                        title: `即將：${next.subject}`,
+                        subtitle: `開始 ${next.start} • 倒數 ${formatCountdown(diff)}`,
+                        progress: Math.max(0, Math.min(100, Math.round( ( (now - parseTime(next.start)) / (parseTime(next.end) - parseTime(next.start)) )*100 ))),
+                        iconClass: 'fa-clock'
+                    });
+
+                } else {
+                    statusBox.innerHTML = `
+                        <div class="text-gray-400 text-6xl mb-4"><i class="fa-solid fa-house-user"></i></div>
+                        <h1 class="text-2xl font-bold text-gray-600">今日課程已結束</h1>
+                    `;
+
+                    // Dynamic Island 收縮為 compact（顯示一個小圖示）
+                    showIslandCompact();
+                }
+            }
+        }
+
+        function scrollToCard(element) {
+            const container = document.getElementById('scheduleList');
+            if(!container) return;
+            const rect = element.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            const elementCenter = rect.top + rect.height / 2;
+            const containerCenter = containerRect.top + containerRect.height / 2;
+
+            if (Math.abs(elementCenter - containerCenter) > 150) {
+                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function startClock() {
+            setInterval(() => {
+                document.getElementById('liveClock').innerText = new Date().toLocaleTimeString('en-GB');
+            }, 1000);
+        }
+
+        // --- AI features preserved ---
+        async function askAiAboutSubject(subject) {
+            const box = document.getElementById('aiAdviceBox');
+            const textEl = document.getElementById('aiAdviceText');
+
+            box.classList.remove('hidden');
+            setTimeout(() => box.classList.remove('translate-y-full'), 10);
+            textEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-purple-500"></i> AI 正在為你準備關於 ${subject} 的學習貼士...`;
+
+            try {
+                const prompt = `Give me a short, encouraging study tip, a fun fact, or a quick motivation quote for a secondary school student about to attend a "${subject}" class. Keep it under 40 words. Language: Traditional Chinese (HK style). Tone: Cheerful and helpful.`;
+                const responseText = await callGemini(prompt);
+                textEl.innerText = responseText;
+            } catch (error) {
+                console.error("AI Error:", error);
+                textEl.innerText = "抱歉，AI 暫時無法提供建議，請稍後再試。";
+            }
+        }
+
+        function closeAiAdvice() {
+            const box = document.getElementById('aiAdviceBox');
+            box.classList.add('translate-y-full');
+            setTimeout(() => box.classList.add('hidden'), 300);
+        }
+
+        function openAiImport() {
+            document.getElementById('aiImportArea').classList.remove('hidden');
+        }
+
+        function closeAiImport() {
+            document.getElementById('aiImportArea').classList.add('hidden');
+            document.getElementById('aiInputText').value = "";
+        }
+
+        async function runAiImport() {
+            const input = document.getElementById('aiInputText').value;
+            if(!input.trim()) { alert("請先輸入文字"); return; }
+
+            const loading = document.getElementById('aiLoadingOverlay');
+            loading.classList.remove('hidden');
+            loading.classList.add('flex');
+
+            try {
+                const prompt = `Parse this school timetable description into a JSON array: "${input}". 
+                Format: [{"start":"HH:mm", "end":"HH:mm", "subject":"Subject Name", "type":"lesson|break|activity"}]. 
+                Rules: Use 24h format. Infer 'break' type for recess/lunch. Return ONLY valid JSON, no markdown formatting.`;
+
+                const jsonStr = await callGemini(prompt, true);
+                let scheduleData = JSON.parse(jsonStr);
+
+                if (Array.isArray(scheduleData)) {
+                    const container = document.getElementById('editorRowsContainer');
+                    container.innerHTML = '';
+                    scheduleData.forEach(item => addEditorRowUI(item));
+
+                    closeAiImport();
+                    alert("AI 解析成功！請檢查內容並儲存。");
+                } else {
+                    throw new Error("Invalid format returned");
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert("AI 解析失敗，請確認輸入格式是否清晰。");
+            } finally {
+                loading.classList.add('hidden');
+                loading.classList.remove('flex');
+            }
+        }
+
+        // --- Editor functions preserved (unchanged) ---
+        function openEditor() {
+            const modal = document.getElementById('editorModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.firstElementChild.classList.remove('scale-95');
+                modal.firstElementChild.classList.add('scale-100');
+            }, 10);
+            document.getElementById('settingRefDate').value = appData.settings.referenceDate;
+            renderEditorSidebar();
+            selectEditorDay('A_1');
+        }
+
+        function closeEditor() {
+            const modal = document.getElementById('editorModal');
+            modal.classList.add('opacity-0');
+            modal.firstElementChild.classList.remove('scale-100');
+            modal.firstElementChild.classList.add('scale-95');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+            closeAiImport();
+        }
+
+        function renderEditorSidebar() {
+            const sidebar = document.getElementById('editorSidebar');
+            sidebar.innerHTML = '';
+
+            const weeks = ['A', 'B'];
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+            weeks.forEach(week => {
+                const weekHeader = document.createElement('div');
+                weekHeader.className = "text-xs font-bold text-gray-400 px-3 py-2 mt-2 uppercase";
+                weekHeader.innerText = `Week ${week}`;
+                sidebar.appendChild(weekHeader);
+
+                days.forEach((dayName, idx) => {
+                    const dayNum = idx + 1;
+                    const key = `${week}_${dayNum}`;
+                    const btn = document.createElement('button');
+                    btn.className = "w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-white hover:shadow-sm transition flex justify-between items-center group";
+                    btn.innerHTML = `<span>${dayName}</span> <i class="fa-solid fa-chevron-right text-xs opacity-0 group-hover:opacity-50"></i>`;
+                    btn.onclick = () => selectEditorDay(key);
+                    btn.id = `btn-day-${key}`;
+                    sidebar.appendChild(btn);
+                });
+            });
+        }
+
+        function selectEditorDay(key) {
+            editingDayKey = key;
+            document.querySelectorAll('#editorSidebar button').forEach(b => b.classList.remove('bg-white', 'shadow-md', 'text-blue-600'));
+            const btn = document.getElementById(`btn-day-${key}`);
+            if(btn) btn.classList.add('bg-white', 'shadow-md', 'text-blue-600');
+
+            const [w, d] = key.split('_');
+            const dayNames = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+            document.getElementById('editorCurrentDayLabel').innerText = `WEEK ${w} - ${dayNames[d]}`;
+
+            const container = document.getElementById('editorRowsContainer');
+            container.innerHTML = '';
+            const schedule = appData.schedules[key] || [];
+            schedule.forEach((item, index) => {
+                addEditorRowUI(item);
+            });
+            closeAiImport();
+        }
+
+        function addEditorRow() {
+            addEditorRowUI({ start: "08:00", end: "08:45", subject: "Subject", type: "lesson" });
+        }
+
+        function addEditorRowUI(data) {
+            const container = document.getElementById('editorRowsContainer');
+            const div = document.createElement('div');
+            div.className = "flex gap-2 items-center bg-white p-2 rounded-lg border border-gray-100 shadow-sm animate-pulse-soft";
+            div.style.animation = 'none';
+
+            div.innerHTML = `
+                <input type="time" class="row-start border rounded px-2 py-1 text-sm bg-gray-50 focus:bg-white w-24" value="${data.start}">
+                <span class="text-gray-300">-</span>
+                <input type="time" class="row-end border rounded px-2 py-1 text-sm bg-gray-50 focus:bg-white w-24" value="${data.end}">
+                <input type="text" class="row-subject border rounded px-2 py-1 text-sm flex-1 focus:ring-2 focus:ring-blue-100 outline-none" placeholder="科目" value="${data.subject}">
+                <select class="row-type border rounded px-2 py-1 text-sm bg-gray-50 w-24">
+                    <option value="lesson" ${data.type==='lesson'?'selected':''}>課堂</option>
+                    <option value="break" ${data.type==='break'?'selected':''}>休息</option>
+                    <option value="activity" ${data.type==='activity'?'selected':''}>活動</option>
+                </select>
+                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-red-500 w-8 h-8 flex items-center justify-center transition"><i class="fa-solid fa-trash-can"></i></button>
+            `;
+            container.appendChild(div);
+        }
+
+        function saveFromEditor() {
+            if(!editingDayKey) return;
+
+            appData.settings.referenceDate = document.getElementById('settingRefDate').value;
+
+            const rows = document.getElementById('editorRowsContainer').children;
+            const newSchedule = [];
+
+            for(let row of rows) {
+                newSchedule.push({
+                    start: row.querySelector('.row-start').value,
+                    end: row.querySelector('.row-end').value,
+                    subject: row.querySelector('.row-subject').value,
+                    type: row.querySelector('.row-type').value
+                });
+            }
+
+            newSchedule.sort((a,b) => a.start.localeCompare(b.start));
+            appData.schedules[editingDayKey] = newSchedule;
+
+            localStorage.setItem('schoolTimetableConfig', JSON.stringify(appData));
+            renderApp();
+            closeEditor();
+
+            const btn = document.querySelector('#editorModal button.bg-green-600');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<i class="fa-solid fa-circle-check"></i> 已儲存`;
+            setTimeout(() => btn.innerHTML = originalText, 2000);
+        }
+
+        function resetToDefault() {
+            if(confirm("確定要重置所有數據到初始狀態嗎？這將刪除你的所有修改。")) {
+                appData = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+                localStorage.setItem('schoolTimetableConfig', JSON.stringify(appData));
+                location.reload();
+            }
+        }
+
+        // --- Export & Share (unchanged) ---
+        function openShare() {
+            document.getElementById('shareModal').classList.remove('hidden');
+            generateShareLink();
+
+            document.getElementById('importFileInput').value = '';
+            document.getElementById('importFileName').innerText = '選擇 .json 檔案';
+            document.getElementById('importBtn').disabled = true;
+            pendingImportData = null;
+        }
+
+        function generateShareLink() {
+            const jsonStr = JSON.stringify(appData);
+            const compressed = btoa(unescape(encodeURIComponent(jsonStr)));
+            const url = `${window.location.origin}${window.location.pathname}#data=${compressed}`;
+            document.getElementById('shareUrlInput').value = url;
+        }
+
+        function copyShareLink() {
+            const input = document.getElementById('shareUrlInput');
+            input.select();
+            document.execCommand('copy');
+            alert("連結已複製到剪貼簿！");
+        }
+
+        function downloadJson() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData, null, 2));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "timetable_backup.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        // --- Import Logic (unchanged) ---
+        function handleFileSelect(input) {
+            const file = input.files[0];
+            if (file) {
+                document.getElementById('importFileName').innerText = file.name;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const json = JSON.parse(e.target.result);
+                        if (json.schedules && json.settings) {
+                            pendingImportData = json;
+                            document.getElementById('importBtn').disabled = false;
+                        } else {
+                            alert("檔案格式錯誤：找不到必要的 schedules 或 settings 欄位");
+                            input.value = '';
+                            document.getElementById('importFileName').innerText = "選擇 .json 檔案";
+                            document.getElementById('importBtn').disabled = true;
+                        }
+                    } catch (err) {
+                        alert("無法解析 JSON 文件，請確認檔案格式正確。");
+                        console.error(err);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function confirmImport() {
+            if (pendingImportData) {
+                if(confirm("確定要導入此備份嗎？這將覆蓋您當前的所有課程表設定，且無法復原。")) {
+                    appData = pendingImportData;
+                    localStorage.setItem('schoolTimetableConfig', JSON.stringify(appData));
+                    location.reload();
+                }
+            }
+        }
+
+        // --- Dynamic Island helper functions ---
+        function showIslandExpanded({title, subtitle, progress=0, iconClass='fa-book'}) {
+            const island = document.getElementById('dynamicIsland');
+            const content = document.getElementById('islandContent');
+            const titleEl = document.getElementById('islandTitle');
+            const subEl = document.getElementById('islandSub');
+            const iconEl = document.getElementById('islandIcon');
+            const bar = document.getElementById('islandProgressBar');
+
+            island.classList.remove('compact');
+            island.classList.add('expanded');
+            content.style.display = 'flex';
+            titleEl.innerText = title;
+            subEl.innerText = subtitle;
+            iconEl.innerHTML = `<i class="fa-solid ${iconClass}"></i>`;
+            bar.style.width = `${progress}%`;
+            island.classList.add('pulse');
+            island.style.opacity = '1';
+        }
+
+        function showIslandCompact() {
+            const island = document.getElementById('dynamicIsland');
+            const content = document.getElementById('islandContent');
+            const iconEl = document.getElementById('islandIcon');
+            const bar = document.getElementById('islandProgressBar');
+
+            island.classList.remove('expanded');
+            island.classList.add('compact');
+            content.style.display = 'none';
+            iconEl.innerHTML = `<i class="fa-solid fa-apple-whole"></i>`;
+            bar.style.width = '0%';
+            island.classList.remove('pulse');
+            island.style.opacity = '0.95';
+        }
+
+    </script>
+</body>
+</html>
