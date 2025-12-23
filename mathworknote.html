@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數學基礎筆記 (20章全)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto+Sans+TC', sans-serif;
+            background-color: #f8fafc;
+        }
+        .chapter-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            margin-bottom: 2rem;
+            padding: 2rem;
+            border-left: 6px solid #3b82f6;
+        }
+        .exercise-box {
+            background-color: #f1f5f9;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+        .answer-content {
+            display: none;
+            color: #059669;
+            font-weight: 500;
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            border-left: 3px solid #10b981;
+            background-color: #ecfdf5;
+        }
+        .show-answer-btn {
+            color: #3b82f6;
+            font-size: 0.875rem;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(4px);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .math-box {
+            background: #fff7ed;
+            border: 1px solid #ffedd5;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            display: inline-block;
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <nav class="p-4">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="font-bold text-xl text-blue-600">數學筆記：從整數到統計</h1>
+            <div class="text-sm text-slate-500">20 個章節精華</div>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto p-4 md:p-8">
+        
+        <!-- 第 1 章 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 1 章｜整數與小數</h2>
+            <div class="space-y-4">
+                <div>
+                    <h3 class="font-bold text-lg">1.1 什麼是整數？</h3>
+                    <p>整數（Integers）是沒有小數部分的數字，包括正整數、負整數和零。</p>
+                    <p class="text-slate-600">例子：… -5、-3、-1, 0, 1, 5, 100 …</p>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg">1.2 什麼是小數？</h3>
+                    <p>小數（Decimals）是有小數點的數字，用來表示不是整數的量。</p>
+                    <p class="text-slate-600">應用：身高 1.68 公尺、價格 NT$29.9。</p>
+                </div>
+            </div>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>判斷：8、-4、0.25、3.0、-7.5 是整數還是小數？</li>
+                    <li>寫出五個日常生活中使用小數的例子。</li>
+                    <li>把 3.0、5.00 寫成整數形式。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans1')">查看答案</span>
+                    <div id="ans1" class="answer-content">
+                        1. 整數：8, -4, 3.0；小數：0.25, -7.5 (註：3.0 數值等於整數)<br>
+                        2. 體溫 36.5度、跑步 1.5公里、飲料 0.7公升、匯率 32.1、體重 55.4公斤。<br>
+                        3. 3、5。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 2 章 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 2 章｜四則運算</h2>
+            <p>包括加（+）、減（-）、乘（×）、除（÷）。</p>
+            <ul class="list-disc ml-5 mt-2 space-y-1">
+                <li><strong>加法：</strong>求總和。性質：交換律 (a+b=b+a)。</li>
+                <li><strong>減法：</strong>拿走另一個數。</li>
+                <li><strong>乘法：</strong>重複加法。性質：分配律 a(b+c)=ab+ac。</li>
+                <li><strong>除法：</strong>平均分配。例子：17 ÷ 5 = 3 餘 2。</li>
+            </ul>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>計算：56+39、84-27、7×9、81÷9。</li>
+                    <li>用生活例子說明加法與乘法的差別。</li>
+                    <li>計算帶餘除法：100 ÷ 6。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans2')">查看答案</span>
+                    <div id="ans2" class="answer-content">
+                        1. 95、57、63、9。<br>
+                        2. 加法是買一個 10 元蘋果和一個 5 元橘子 (10+5)；乘法是買 5 個 10 元蘋果 (10×5)。<br>
+                        3. 16 餘 4。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 3 章 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 3 章｜運算次序</h2>
+            <div class="math-box">規則：括號先算 → 先乘除 → 後加減 → 由左至右</div>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>計算：20+6×4、(20+6)×4。</li>
+                    <li>計算：100 ÷ (10-5) × 2。</li>
+                    <li>計算：48÷8 + 7×3 - 10。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans3')">查看答案</span>
+                    <div id="ans3" class="answer-content">
+                        1. 20+24=44；26×4=104。<br>
+                        2. 100÷5×2 = 20×2 = 40。<br>
+                        3. 6 + 21 - 10 = 17。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 4 章 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 4 章｜分數</h2>
+            <p>結構：分子 / 分母。1/2 = 0.5, 1/4 = 0.25。</p>
+            <p class="mt-2"><strong>約分：</strong>找公因數除之。<strong>通分：</strong>找最小公倍數。</p>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>約分：15/25、18/24。</li>
+                    <li>小數轉分數：0.75、0.2。</li>
+                    <li>比較大小：3/5 與 4/7。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans4')">查看答案</span>
+                    <div id="ans4" class="answer-content">
+                        1. 3/5、3/4。<br>
+                        2. 3/4、1/5。<br>
+                        3. 3/5 = 21/35, 4/7 = 20/35。所以 3/5 > 4/7。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 5 章 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 5 章｜繁分數</h2>
+            <p>計算原則：<strong>除法轉乘法，取倒數。</strong></p>
+            <div class="math-box">(2/3) ÷ (4/5) = (2/3) × (5/4) = 5/6</div>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>計算：(5/6) ÷ (3/4)。</li>
+                    <li>計算：12 ÷ (3/4)。</li>
+                    <li>一塊蛋糕分成1/2，再把其中一半分成3等分，每份是多少？</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans5')">查看答案</span>
+                    <div id="ans5" class="answer-content">
+                        1. (5/6) × (4/3) = 20/18 = 10/9。<br>
+                        2. 12 × (4/3) = 16。<br>
+                        3. (1/2) ÷ 3 = 1/2 × 1/3 = 1/6。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 6 章 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 6 章｜正數與負數</h2>
+            <p>絕對值 |x| 表示距離 0 的距離。恆為正或零。</p>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>計算絕對值：|-8|、|-2.5|。</li>
+                    <li>寫出兩個生活中的負數例子。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans6')">查看答案</span>
+                    <div id="ans6" class="answer-content">
+                        1. 8、2.5。<br>
+                        2. 氣溫零下 -5度、銀行透支(負債) -1000元。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 7 - 9 章: 正負數運算 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 7, 8, 9 章｜正負數運算規則</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="p-4 border rounded">
+                    <h3 class="font-bold">加減法</h3>
+                    <p>減去一個數 = 加上相反數。</p>
+                    <p class="text-sm">8 - (-5) = 8 + 5 = 13</p>
+                </div>
+                <div class="p-4 border rounded">
+                    <h3 class="font-bold">乘除法</h3>
+                    <p>同號得正，異號得負。</p>
+                    <p class="text-sm">(-2) × (-3) = 6<br>(-6) ÷ 2 = -3</p>
+                </div>
+            </div>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>計算：-8 + 5、-10 - (-6)。</li>
+                    <li>計算：-6 × (-4)、24 ÷ (-6)。</li>
+                    <li>早上 -3°C，上升 7°C，現在幾度？</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans789')">查看答案</span>
+                    <div id="ans789" class="answer-content">
+                        1. -3、-4。<br>
+                        2. 24、-4。<br>
+                        3. -3 + 7 = 4°C。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 10 - 12 章: 代數基礎 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 10, 11, 12 章｜代數與化簡</h2>
+            <p>代數式由數字、變數(x, y)及運算組成。<strong>同類項</strong>是指變數與指數完全相同的項。</p>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>寫出「三倍某數加五」的代數式。</li>
+                    <li>當 x=5 時，3x + 7 等於多少？</li>
+                    <li>合併同類項：10a - 7b + 2a + 3b。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans101112')">查看答案</span>
+                    <div id="ans101112" class="answer-content">
+                        1. 3x + 5。<br>
+                        2. 3(5) + 7 = 15 + 7 = 22。<br>
+                        3. 12a - 4b。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 13 - 15 章: 多項式 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 13, 14, 15 章｜多項式與公式</h2>
+            <p><strong>次數：</strong>最高項的指數。例如 5x⁴ - 2 為 4 次。</p>
+            <p class="mt-2"><strong>乘法公式：</strong> (a + b)² = a² + 2ab + b²</p>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>計算：(4x + 5) + (2x - 3)。</li>
+                    <li>計算：(x + 5)(x + 4)。</li>
+                    <li>展開：(2y - 3)²。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans131415')">查看答案</span>
+                    <div id="ans131415" class="answer-content">
+                        1. 6x + 2。<br>
+                        2. x² + 9x + 20。<br>
+                        3. 4y² - 12y + 9。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 16 - 18 章: 一次方程 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 16, 17, 18 章｜一元一次方程</h2>
+            <p>步驟：移項（變號）→ 合併同類項 → 求出未知數。</p>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>解方程：3x - 7 = 8。</li>
+                    <li>某數的兩倍減 3 等於 9，求此數。</li>
+                    <li>兩數和為 100，差為 20，求兩數。</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans161718')">查看答案</span>
+                    <div id="ans161718" class="answer-content">
+                        1. 3x = 15 → x = 5。<br>
+                        2. 2x - 3 = 9 → 2x = 12 → x = 6。<br>
+                        3. 設兩數 x, y：x+y=100, x-y=20。相加得 2x=120 → x=60, y=40。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 第 19 - 20 章: 統計與平均 -->
+        <section class="chapter-card">
+            <h2 class="text-2xl font-bold text-blue-700 mb-4">第 19, 20 章｜統計與平均數</h2>
+            <p><strong>平均數：</strong> 總和 ÷ 個數。</p>
+            <p>統計圖表包括條形圖（比較數量）、折線圖（趨勢）、圓餅圖（比例）。</p>
+            
+            <div class="exercise-box">
+                <h4 class="font-bold mb-2">✍️ 練習題</h4>
+                <ol class="list-decimal ml-5 space-y-2">
+                    <li>計算平均：10, 15, 20, 25。</li>
+                    <li>五天氣溫：18, 20, 19, 22, 21，平均幾度？</li>
+                </ol>
+                <div class="mt-4">
+                    <span class="show-answer-btn" onclick="toggleAnswer('ans1920')">查看答案</span>
+                    <div id="ans1920" class="answer-content">
+                        1. (10+15+20+25) / 4 = 70 / 4 = 17.5。<br>
+                        2. (18+20+19+22+21) / 5 = 100 / 5 = 20°C。
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center text-slate-400 text-sm py-8">
+            &copy; 2024 數學基礎筆記系列 - 祝學習愉快
+        </footer>
+    </main>
+
+    <script>
+        function toggleAnswer(id) {
+            const ans = document.getElementById(id);
+            if (ans.style.display === "block") {
+                ans.style.display = "none";
+            } else {
+                ans.style.display = "block";
+            }
+        }
+    </script>
+</body>
+</html>
