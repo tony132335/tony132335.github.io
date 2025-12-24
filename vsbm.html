@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="user-scalable=no">
+<title>Mandelbulb 4K</title>
+<style>
+body { margin:0; overflow:hidden; background:#111; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+
+<canvas id="c" width="4096" height="4096"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const gl = canvas.getContext("webgl", { antialias:false });
+
+const vs = `
+attribute vec2 p;
+varying vec2 uv;
+void main(){
+  uv = p;
+  gl_Position = vec4(p,0.0,1.0);
+}
+`;
+
+const fs = `
+precision highp float;
+varying vec2 uv;
+
+uniform vec3 camPos;
+uniform mat3 camRot;
+uniform float time;
+
+#define MAX_STEPS 150
+#define MAX_DIST 20.0
+#define SURF_DIST 0.001
+
+// Mandelbulb DE
+float mandelbulb(vec3 p){
+    vec3 z = p;
+    float dr = 1.0;
+    float r = 0.0;
+    for(int i=0;i<12;i++){
+        r = length(z);
+        if(r>4.0) break;
+
+        float theta = acos(z.z/r);
+        float phi = atan(z.y,z.x);
+        float power = 8.0;
+
+        dr = pow(r,power-1.0)*power*dr + 1.0;
+
+        float zr = pow(r,power);
+        theta *= power;
+        phi *= power;
+
+        z = zr * vec3(
+            sin(theta)*cos(phi),
+            sin(theta)*sin(phi),
+            cos(theta)
+        ) + p;
+    }
+    return 0.5*log(r)*r/dr;
+}
+
+float rayMarch(vec3 ro, vec3 rd){
+    float dO = 0.0;
+    for(int i=0;i<MAX_STEPS;i++){
+        vec3 p = ro + rd*dO;
+        float dS = mandelbulb(p);
+        if(dS<SURF_DIST || dO>MAX_DIST) break;
+        dO += dS;
+    }
+    return dO;
+}
+
+vec3 getNormal(vec3 p){
+    float e = 0.0005;
+    vec2 h = vec2(e,0);
+    return normalize(vec3(
+        mandelbulb(p+h.xyy)-mandelbulb(p-h.xyy),
+        mandelbulb(p+h.yxy)-mandelbulb(p-h.yxy),
+        mandelbulb(p+h.yyx)-mandelbulb(p-h.yyx)
+    ));
+}
+
+void main(){
+    vec2 uvn = uv;
+    vec3 ro = camPos;
+    vec3 rd = normalize(camRot * vec3(uvn, -1.8));
+
+    float d = rayMarch(ro, rd);
+    vec3 col = vec3(0.0);
+
+    if(d<MAX_DIST){
+        vec3 p = ro + rd*d;
+        vec3 n = getNormal(p);
+        vec3 light = normalize(vec3(0.4,0.8,0.2));
+
+        float diff = max(dot(n,light),0.0);
+        float ao = exp(-0.15*d);
+
+        col = vec3(
+            sin(length(p)*4.0)*0.5+0.5,
+            sin(length(p)*4.0+2.1)*0.5+0.5,
+            sin(length(p)*4.0-2.1)*0.5+0.5
+        );
+
+        col *= diff*1.4 + 0.15;
+        col *= ao;
+    }
+
+    gl_FragColor = vec4(col,1.0);
+}
+`;
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if(!gl.getShaderParameter(s, gl.COMPILE_STATUS))
+    throw gl.getShaderInfoLog(s);
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER,vs));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER,fs));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+  -1,-1, 1,-1, 1,1,
+  -1,-1, 1,1, -1,1
+]), gl.STATIC_DRAW);
+
+const loc = gl.getAttribLocation(prog,"p");
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+
+const camPosLoc = gl.getUniformLocation(prog,"camPos");
+const camRotLoc = gl.getUniformLocation(prog,"camRot");
+const timeLoc = gl.getUniformLocation(prog,"time");
+
+let angX=0.4, angY=0.7, dist=4.0;
+let mx,my,drag=false;
+
+canvas.onmousedown=e=>{drag=true;mx=e.clientX;my=e.clientY;}
+window.onmouseup=()=>drag=false;
+window.onmousemove=e=>{
+  if(drag){
+    angY+=(e.clientX-mx)*0.004;
+    angX+=(e.clientY-my)*0.004;
+    mx=e.clientX;my=e.clientY;
+  }
+};
+canvas.onwheel=e=>{
+  dist*=Math.exp(e.deltaY*0.001);
+};
+
+function rot(){
+  const cx=Math.cos(angX),sx=Math.sin(angX);
+  const cy=Math.cos(angY),sy=Math.sin(angY);
+  return new Float32Array([
+    cy,0,-sy,
+    sx*sy,cx,sx*cy,
+    cx*sy,-sx,cx*cy
+  ]);
+}
+
+function draw(t){
+  gl.uniform1f(timeLoc,t*0.001);
+  gl.uniform3f(camPosLoc,0,0,dist);
+  gl.uniformMatrix3fv(camRotLoc,false,rot());
+  gl.drawArrays(gl.TRIANGLES,0,6);
+  requestAnimationFrame(draw);
+}
+
+draw(0);
+</script>
+</body>
+</html>
