@@ -1,1 +1,1 @@
-本次更新带来了Bug修复，优化了代码逻辑，并将AI聊天服务该用GrokAI
+本次更新带来了Bug修复，以及因worldtimeapi.org服务下线导致无法使用“每日幸运数字“的问题,新版本采用了timeapi.world
